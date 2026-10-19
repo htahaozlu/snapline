@@ -3,12 +3,15 @@
 # app inside a signed, notarized and stapled DMG, plus its SHA-256. Output: dist/
 #
 #   SNAPLINE_NOTARY_PROFILE=<keychain profile> scripts/release.sh
+#   SNAPLINE_NOTARY_KEY=AuthKey_XXXX.p8 SNAPLINE_NOTARY_KEY_ID=XXXX SNAPLINE_NOTARY_ISSUER=<uuid> scripts/release.sh
 #
-# Needs (once): a "Developer ID Application" identity in the login keychain, and notary
-# credentials stored with `xcrun notarytool store-credentials <profile>`.
+# Needs: a "Developer ID Application" identity in the login keychain, and notary credentials:
+# a profile stored with `xcrun notarytool store-credentials <profile>`, or an App Store Connect API
+# key (.p8 file, key ID, issuer ID) passed straight to notarytool (nothing is stored).
 # Environment
 #   SNAPLINE_DEVELOPER_ID     identity SHA-1 or name (default: the first "Developer ID Application")
-#   SNAPLINE_NOTARY_PROFILE   notarytool keychain profile (required)
+#   SNAPLINE_NOTARY_PROFILE   notarytool keychain profile, or
+#   SNAPLINE_NOTARY_KEY / SNAPLINE_NOTARY_KEY_ID / SNAPLINE_NOTARY_ISSUER   an API key
 #   SNAPLINE_ALLOW_DIRTY=1    build from a tree with uncommitted changes (never for a published release)
 #
 # Network: Apple's timestamp server (codesign --timestamp) and notary service (the app and the DMG
@@ -22,8 +25,14 @@ cd "$ROOT"
 log()  { printf '\033[1m==>\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 
-PROFILE="${SNAPLINE_NOTARY_PROFILE:-}"
-[ -n "$PROFILE" ] || die "set SNAPLINE_NOTARY_PROFILE (xcrun notarytool store-credentials <profile>)"
+if [ -n "${SNAPLINE_NOTARY_PROFILE:-}" ]; then
+    NOTARY=(--keychain-profile "$SNAPLINE_NOTARY_PROFILE")
+elif [ -n "${SNAPLINE_NOTARY_KEY:-}" ] && [ -n "${SNAPLINE_NOTARY_KEY_ID:-}" ] && [ -n "${SNAPLINE_NOTARY_ISSUER:-}" ]; then
+    [ -r "$SNAPLINE_NOTARY_KEY" ] || die "cannot read $SNAPLINE_NOTARY_KEY"
+    NOTARY=(--key "$SNAPLINE_NOTARY_KEY" --key-id "$SNAPLINE_NOTARY_KEY_ID" --issuer "$SNAPLINE_NOTARY_ISSUER")
+else
+    die "notary credentials: set SNAPLINE_NOTARY_PROFILE, or SNAPLINE_NOTARY_KEY + _KEY_ID + _ISSUER"
+fi
 VERSION="$(grep -E 'const[[:space:]]+version_string' core/src/root.zig | grep -Eo '"[^"]+"' | head -1 | tr -d '"')"
 [ -n "$VERSION" ] || die "version_string not found in core/src/root.zig"
 if [ "${SNAPLINE_ALLOW_DIRTY:-0}" != "1" ] && [ -n "$(git status --porcelain)" ]; then
@@ -58,7 +67,7 @@ grep -q '^Timestamp=' <<<"$INFO" || die "no secure timestamp (notarization would
 
 log "notarize the app (uploads to Apple)"
 ditto -c -k --keepParent "$APP" "$OUT/Snapline.zip"
-xcrun notarytool submit "$OUT/Snapline.zip" --keychain-profile "$PROFILE" --wait
+xcrun notarytool submit "$OUT/Snapline.zip" "${NOTARY[@]}" --wait
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 rm -f "$OUT/Snapline.zip"
@@ -73,7 +82,7 @@ codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN" --timestamp "$DMG"
 codesign --verify --strict --verbose=2 "$DMG"
 
 log "notarize the DMG (uploads to Apple)"
-xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
+xcrun notarytool submit "$DMG" "${NOTARY[@]}" --wait
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 
