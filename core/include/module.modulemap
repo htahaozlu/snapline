@@ -1,0 +1,4 @@
+module NoktaCore {
+    header "nokta.h"
+    export *
+}

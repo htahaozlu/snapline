@@ -1,0 +1,43 @@
+{
+  "_comment": "Rules for tools/integrity/analyze.py. 'deny' entries are violations (exit 1); 'watch' entries are listed as warnings for review. Regexes are Python re, searched (not anchored) unless they start with ^.",
+
+  "allowed_dylib_prefixes": ["/System/Library/Frameworks/", "/usr/lib/"],
+
+  "deny_dylib": [
+    {"id": "private-framework", "regex": "/PrivateFrameworks/|/SkyLight\\.|/CoreSymbolication|/MultitouchSupport|/Apple80211|/CoreDock|/DisplayServices|/CoreBrightness", "why": "private framework linked"},
+    {"id": "network-framework", "regex": "/(CFNetwork|Network|NetworkExtension|SystemConfiguration|WebKit|MultipeerConnectivity|CloudKit|StoreKit|GameKit)\\.framework/|/libnetwork|/libcurl", "why": "network-capable framework linked"},
+    {"id": "updater", "regex": "Sparkle|Squirrel|Paddle|Keystone|Omaha|Updater", "why": "auto-update framework linked"},
+    {"id": "non-system-dylib", "regex": "@rpath|@executable_path|@loader_path", "why": "bundled / relative dylib (nothing may be bundled)"}
+  ],
+
+  "deny_symbol": [
+    {"id": "net-libc", "regex": "^_(socket|connect|getaddrinfo|gethostbyname2?|gethostbyaddr|getnameinfo|sendto|recvfrom|sendmsg|recvmsg|listen|accept|bind|getsockname|getpeername|getifaddrs|freeaddrinfo)$", "why": "BSD socket / resolver import"},
+    {"id": "net-cfnetwork", "regex": "^_(CFNetwork|CFHTTP|CFHost|CFNetService|CFSocket|CFStreamCreatePairWith(Socket|PeerSocketSignature|SocketToHost)|CFURLConnection|CFURLSession|CFURLCredential)", "why": "CFNetwork / CFSocket import"},
+    {"id": "net-objc", "regex": "_OBJC_(META)?CLASS_\\$_(NSURLSession|NSURLConnection|NSURLDownload|NSURLProtocol|NSNetService|NSNetServiceBrowser|NSURLSessionConfiguration|NWConnection|NWPath|NWListener)", "why": "Foundation networking class"},
+    {"id": "net-swift", "regex": "URLSession|URLConnection|NWConnection|NWListener|NWPathMonitor|\\$s7Network", "why": "Swift URLSession / Network.framework symbol"},
+    {"id": "net-nw", "regex": "^_nw_", "why": "Network.framework C API (nw_*)"},
+    {"id": "private-api", "regex": "^_(CGS|SLS|SLPS|SLSS)[A-Za-z]|^_?_AXUIElementGetWindow$|^_CoreDock|^_DS[A-Z][A-Za-z]+$|^__AXObserverAddNotificationAndCheckRemote$", "why": "private SkyLight / CGS / HIServices API"},
+    {"id": "updater", "regex": "Sparkle|SPUUpdater|SPUStandardUpdater|SUUpdater|_OBJC_CLASS_\\$_SU[A-Z]", "why": "updater symbol"}
+  ],
+
+  "watch_symbol": [
+    {"id": "screen-capture", "regex": "CGWindowListCreateImage|CGDisplayCreateImage|CGDisplayStream|SCStream|SCScreenshot", "why": "reads screen content (Screen Recording permission)"},
+    {"id": "window-list", "regex": "CGWindowListCopyWindowInfo", "why": "enumerates other apps' windows"},
+    {"id": "event-synthesis", "regex": "CGEventPost|CGEventPostToPid|CGEventCreate(Keyboard|Mouse|Scroll)Event|CGPostKeyboardEvent|CGPostMouseEvent", "why": "synthesises input events"},
+    {"id": "input-monitoring", "regex": "CGEventTapCreate|IOHIDManager|IOHIDDevice", "why": "observes input (event tap must be listen-only; check the core source)"},
+    {"id": "process-exec", "regex": "^_(system|popen|posix_spawn|posix_spawnp|execve|execv|execvp|fork)$|_OBJC_CLASS_\\$_NSTask", "why": "spawns processes"},
+    {"id": "dynamic-loading", "regex": "^_(dlopen)$", "why": "loads code at run time"},
+    {"id": "symbol-lookup", "regex": "^_dlsym$", "why": "resolves a symbol at run time (expected: two exported but undeclared HIToolbox functions — HIWindowGetAvailablePositioningBounds, a fallback for the display usable frame, and CopySymbolicHotKeys, read-only list of macOS's own enabled shortcuts for the recorder)"}
+  ],
+
+  "deny_plist_key": "(?i)url|feed|^SU[A-Z]|appTransportSecurity|exceptiondomain|updat|sparkle",
+  "deny_plist_value": "^[A-Za-z][A-Za-z0-9+.-]*://",
+
+  "forbidden_bundle_paths": [
+    "Contents/Frameworks", "Contents/Library", "Contents/XPCServices", "Contents/PlugIns", "Contents/Helpers", "Contents/SharedSupport"
+  ],
+
+  "url_literal_ignore": ["^http://www\\.apple\\.com/DTDs/", "^(radr|rdar)://\\d+$"],
+
+  "allowed_entitlement_keys": []
+}

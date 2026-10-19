@@ -1,0 +1,16 @@
+.zig-cache/
+zig-out/
+build/
+*.o
+.DS_Store
+/tools/bench/out/
+/zig-out-x86_64/
+/tools/bench/.build/
+/tools/integrity/out/
+/tools/snapshot/.build/
+/tools/snapshot/out/
+/.work/
+/tools/a11y/.build/
+/dist/
+/.playwright-mcp/
+__pycache__/
