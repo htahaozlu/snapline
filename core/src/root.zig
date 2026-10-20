@@ -37,7 +37,7 @@ comptime {
     _ = @import("abi.zig");
 }
 
-const version_string: [:0]const u8 = "0.3.0";
+const version_string: [:0]const u8 = "0.4.0";
 
 // ---- pure exports -------------------------------------------------------
 
