@@ -130,8 +130,8 @@ move other apps' windows. No Input Monitoring, no Screen Recording, nothing leav
   </tr>
 </table>
 
-The last screen is a practice. Snapline outlines the next shortcut, shows the modifiers you hold on
-the keycaps, ticks each shortcut that arrives and moves the window, and when a press goes elsewhere it
+The last screen is a practice. It shows only the keys of the next shortcut, presses the ones you
+hold, ticks each shortcut that arrives and moves the window, and when a press goes elsewhere it
 says where: <kbd>⌥⌘←</kbd> belongs to the *Option-Command* set (one click switches), Tiles is running
 and holds the key, or the key reached the window instead of Snapline. The demo waits while you press
 and carries on after a few quiet seconds.

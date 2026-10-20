@@ -418,12 +418,12 @@ Bütün yüzeylerin metni `design-v2-opus.md` §Metin tablolarındaki v2 sütunu
 |---|---|---|---|---|
 | 1 Welcome | A sürükle-oturt (bir kez; tıklayınca yeniden) | yazı markası `nokta.` (noktası sahneden uçarak gelir) · `Drag a window to an edge, or press a shortcut.` | — | `Continue` |
 | 2 Access | B izin anahtarı (beklerken ≤ 3 döngü + kuyruk) | `Allow Accessibility` · `Nokta needs it to move windows. Nothing leaves your Mac.` | Solda ● `Waiting…` (R4); sağda `Not working?` (NSPopover: `Remove Nokta with −, then add it again.`) | `Open System Settings` (Back ve Later görünür). İzin gelince `Continue` olur, Later gizlenir. |
-| 3 Try (alıştırma) | C rehber: sıradaki adımın tuşları basar, pencere oturur (2400 ms döngü, ≤ 3); kullanıcı basınca durur, 6 s sessizlikten sonra sıradaki adım için yeniden | `Try a shortcut` · 4 chip: `⌃⌥← Left`, `⌃⌥→ Right`, `⌃⌥↩ Maximize`, `⌃⌥⌫ Restore` (sıradaki ink çerçeveli, VoiceOver `next`; denenince ✓) · alıştırma satırı (aşağıda) | `Shortcuts` [Classic ⌃⌥ \| Option-Command ⌥⌘ \| Alternate ⌃⇧⌘] (her zaman); `Open at login` (switch, varsayılan açık) | `Done` |
+| 3 Try (alıştırma) | C: yalnız sıradaki kısayolun büyük tuşları ve adı; tuşlar döngüde basar (2400 ms, ≤ 3); kullanıcı basınca durur, 6 s sessizlikten sonra yeniden; bitince `All set.` | `Try a shortcut` · 4 chip: `⌃⌥← Left`, `⌃⌥→ Right`, `⌃⌥↩ Maximize`, `⌃⌥⌫ Restore` (sıradaki ink çerçeveli, VoiceOver `next`; denenince ✓) · alıştırma satırı (aşağıda) | `Shortcuts` [Classic ⌃⌥ \| Option-Command ⌥⌘ \| Alternate ⌃⇧⌘] (her zaman); `Open at login` (switch, varsayılan açık) | `Done` |
 
 - **İzinsiz ekran 3:** alıştırma satırı `Shortcuts start after you allow access. Snapline stays in the menu bar` + ikon; tuşlar hiçbir şeyi değiştirmez, chip çerçevelenmez.
 - **Alıştırma satırı** (ekran 3; tuşlar keycap 13 ink, metin body secondary; VoiceOver tuşları heceler, yalnız sonuçlar duyurulur):
   - Adım: `Press ⌃⌥← to move this window left.` (→ `to move it right`, ↩ `to fill the screen`, ⌫ `to put it back`).
-  - Değiştirici basılıyken: `⌃ held. Add ⌥.` · `⌃⌥ held. Now press ←.` · `⌥⌘ held. This set uses ⌃⌥.` Stage'deki tuşlar da basılı görünür (hareketsiz poz).
+  - Değiştirici basılıyken: doğru olanlar yalnız sahnedeki tuşlarda basılı görünür (hareketsiz poz), satır adımda kalır; adımın kullanmadığı değiştiriciler satırda: `⌥⌘ held. This step uses ⌃⌥.`
   - Snap: `✓ ⌃⌥←. Next, press ⌃⌥→ to move it right.` (sürüklemeyle: `✓ Left Half. …`). Dördü bitince `All four work. Snapline stays in the menu bar` + ikon.
   - Pencereye ulaşan bir basış (Carbon Snapline'ın kısayollarını uygulamaya hiç ulaştırmaz): başka setin kısayolu `⌥⌘← is Left Half in Option-Command. Choose it below.` · bilinmeyen `⌃K is not a Snapline shortcut. Try ⌃⌥←.` · değiştiricisiz adım tuşu `Hold ⌃⌥ while you press ←.` · Snapline'ın kendi kısayolu `⌃⌥← reached this window, not Snapline: another app has it.` · VoiceOver askısı. ⌘ komutları, Tab, Return, yazı yok sayılır; olay tüketilmez.
   - Hata: `⌃⌥↩ reached Snapline, but: This window cannot be moved.`; boşta Restore `✓ ⌃⌥⌫ works. There was nothing to put back yet.` (sayılır).
@@ -450,10 +450,10 @@ Bütün yüzeylerin metni `design-v2-opus.md` §Metin tablolarındaki v2 sütunu
   - 1.8 s sonra nokta red'den ink'e döner. Sahne B anında "açık" pozuna geçer.
   - Zamanlama (inceleme sonrası, OV2-10): başlık sıralı değişir (eski 0–60 çıkar, yeni 60–120 girer), gövde de sıralı (eski 160–240, yeni 240–320); iki metin hiç üst üste binmez. Uçan noktanın yay kontrol noktası `(2·slot.x − dot.x, min(dot.y, slot.y) − 0.9·titleSize)`: nokta başlığın sonunun üstünden geçip yuvaya sağdan iner, başlık gliflerinin üstünden geçmez.
   - Ekran görünmüyorken izin gelirse sahne, ekran görünür olunca oynar. Bu, özel an 2'dir.
-- **C — Alıştırma rehberi** (0.4.0; 2400 ms döngü, ≤ 3; restT 0 = dikiş, explainT 750):
-  - Sıradaki adımın segmenti 600'de başlar: tuşlar iner, pencere 700'de hedefe oturur (O5 flash), tuşlar kalkar; dikiş pencereyi geri koyar.
-  - Gerçek her snap'te (ekran 3 görüldükten sonra) o eylemin segmenti bir kez, pencerenin bulunduğu yerden oynar (ayna); klavyeden gelmediyse tuşlar basmaz.
-  - Herhangi bir tuş rehberi durdurur; 6 s tuşsuz geçince sıradaki adım için yeniden başlar. Reduce Motion: explain pozu, hareket yok.
+- **C — Alıştırma tuşları** (0.4.0): sahnede minyatür pencere yok — hareket eden gerçek penceredir (onboarding'in kendisi). Yalnız sıradaki kısayolun tuşları (64 pt, ortada) ve altında adımın adı (plate, ink.2).
+  - Rehber: 2400 ms döngü, ≤ 3; tuşlar 600'de iner, 1000'de kalkar; restT 0 = dikiş, explainT 750 (tuşlar basılı).
+  - Snap ya da sayılan Restore: sıradaki adımın tuşları 240 ms'de belirir (opaklık 0→1, ölçek 0.96→1). Dördü bitince tuş yok, ortada `All set` + kırmızı nokta.
+  - Herhangi bir tuş rehberi durdurur; 6 s tuşsuz geçince yeniden başlar. Reduce Motion: explain pozu, hareket yok.
 - **D — Ekran geçişi** (Opus Storyboard D, 320 ms): eski metin ve sahne içeriği 160 ms'de çıkar; yenisi 80. ms'de başlayıp 240 ms'de girer. Stage çerçevesi sabittir. Reduce Motion'da 150 ms linear çapraz geçiş.
 - **İmleç:** Nokta'nın kendi ok yoludur (12 × 18; yol `design-v2-opus.md` §3.6). Sistem imleci kopyalanmaz.
 

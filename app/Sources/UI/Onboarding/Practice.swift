@@ -7,7 +7,7 @@ enum PracticeStatus {
     case locked
     /// Press the step's shortcut.
     case next(NoktaAction)
-    /// Modifiers are down (the step's action, if any, tells which ones it needs).
+    /// Modifiers the step does not use are down (the step's action, if any, names the right ones).
     case holding(NoktaMods, NoktaAction?)
     /// A shortcut (or a drag, `keyboard` false) snapped the window; then the next step, if any.
     case worked(NoktaAction, keyboard: Bool, next: NoktaAction?)
@@ -74,9 +74,7 @@ enum PracticeStatus {
             return press(a)
         case let .holding(m, a):
             guard let a, let s = shortcut(a) else { return [S.k(m), S.t(" held.")] }
-            if m == s.modifiers { return [S.k(m), S.t(" held. Now press "), S.key(s.keyCode), S.t(".")] }
-            if s.modifiers.isSuperset(of: m) { return [S.k(m), S.t(" held. Add "), S.k(s.modifiers.subtracting(m)), S.t(".")] }
-            return [S.k(m), S.t(" held. This set uses "), S.k(s.modifiers), S.t(".")]
+            return [S.k(m), S.t(" held. This step uses "), S.k(s.modifiers), S.t(".")]
         case let .worked(a, keyboard, next):
             guard let next else { return PracticeStatus.done.runs(shortcut) }
             let head = keyboard ? [S.t("✓ "), S.k(shortcut(a)), S.t(". ")] : [S.t("✓ \(a.title). ")]

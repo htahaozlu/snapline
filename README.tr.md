@@ -104,8 +104,7 @@ Snapline menü çubuğunda yaşar ve yalnız **Accessibility** (Erişilebilirlik
 uygulamaların pencerelerini okuma ve taşıma izni. Input Monitoring yok, Screen Recording yok, hiçbir
 şey Mac'inizden çıkmaz.
 
-Son ekran bir alıştırma. Snapline sıradaki kısayolu çerçeveler, tuttuğunuz değiştiricileri tuşların
-üstünde gösterir, gelip pencereyi taşıyan her kısayolu işaretler; bir basış başka yere giderse nereye
+Son ekran bir alıştırma. Yalnız sıradaki kısayolun tuşlarını gösterir, tuttuklarınızı basılı çizer, gelip pencereyi taşıyan her kısayolu işaretler; bir basış başka yere giderse nereye
 gittiğini söyler: <kbd>⌥⌘←</kbd> *Option-Command* setinindir (tek tıkla geçilir), Tiles açık ve tuşu
 tutuyor, ya da tuş Snapline yerine pencereye ulaştı. Siz bastıkça demo bekler, birkaç saniye sessizlikten
 sonra devam eder.

@@ -17,7 +17,8 @@ import AppKit
 //      Snapline's own shortcuts reaching the window means Snapline did not get it
 //   P6 a shortcut another app holds: the line names it (and a running Tiles); when an app quits,
 //      Snapline binds that one again — only that one
-//   P7 the stage: held modifiers press their keycaps; the guide keeps its loop seam and poses
+//   P7 the stage: only the next step's keys and name; held modifiers press their keycaps; the
+//      guide keeps its loop seam and poses; the next step arrives; `All set.` at the end
 //   P8 launch: people who set up before the practice existed see it once, on its own screen
 
 enum PracticeTests {
@@ -231,16 +232,20 @@ enum PracticeTests {
         c.expect(o.tryScreen.line.accessibilityLabel() == o.practiceLine, "P4 VoiceOver reads the line with spelled keys")
         c.expect(!o.practiceIsPaused, "P4 nothing pressed: the guide may play")
 
+        let step = o.stageKeys
+        c.expect(step.shortcut == s(0x7B, [.control, .option]) && step.title == "Left Half" && !step.done, "P4 the stage shows ⌃⌥← and its name only")
         o.testPracticeFlags([.control])
-        c.expect(o.practiceLine == "Control held. Add Option." && o.practiceIsPaused, "P4 ⌃ down: the line asks for ⌥, the guide waits (\(o.practiceLine))")
+        c.expect(o.practiceLine == "Press Control Option Left Arrow to move this window left." && o.practiceIsPaused && o.heldModifiers == [.control],
+                 "P4 ⌃ down: the keycap shows it, the line stays on the step, the guide waits (\(o.practiceLine))")
         o.testPracticeFlags([.control, .option])
-        c.expect(o.practiceLine == "Control Option held. Now press Left Arrow.", "P4 ⌃⌥ down: now the key (\(o.practiceLine))")
+        c.expect(o.practiceLine == "Press Control Option Left Arrow to move this window left.", "P4 ⌃⌥ down: still the step (\(o.practiceLine))")
         o.testPracticeFlags([.option, .command])
-        c.expect(o.practiceLine == "Option Command held. This set uses Control Option.", "P4 ⌥⌘ down: this set uses ⌃⌥ (\(o.practiceLine))")
+        c.expect(o.practiceLine == "Option Command held. This step uses Control Option.", "P4 ⌥⌘ down: the wrong modifiers are named (\(o.practiceLine))")
         o.testPracticeFlags([.control, .option])
 
         o.noteSnap(event(.snapped, .leftHalf))
         c.expect(chips[0].tried && !chips[0].isTarget && chips[1].isTarget && o.practiceTarget == .rightHalf, "P4 a snap ticks the step, the next one is outlined")
+        c.expect(o.stageKeys.shortcut == s(0x7C, [.control, .option]) && o.stageKeys.title == "Right Half", "P4 the stage moves on to ⌃⌥→")
         c.expect(o.practiceLine == "✓ Control Option Left Arrow. Next, press Control Option Right Arrow to move it right.",
                  "P4 the line names the next step (\(o.practiceLine))")
         o.testPracticeFlags([])
@@ -261,6 +266,7 @@ enum PracticeTests {
         o.noteSnap(event(.snapped, .maximize))
         c.expect(o.practiceTarget == nil && chips.allSatisfy(\.tried) && !chips.contains(where: \.isTarget), "P4 all four tried")
         c.expect(o.practiceLine == "All four work. Snapline stays in the menu bar.", "P4 done (\(o.practiceLine))")
+        c.expect(o.stageKeys.shortcut == nil && o.stageKeys.done && o.stageKeys.title == "All set", "P4 the stage closes with All set.")
         o.testPracticeIdle()
         c.expect(o.practiceLine == "All four work. Snapline stays in the menu bar.", "P4 done stays after the idle time")
 
@@ -338,24 +344,29 @@ enum PracticeTests {
 
     static func stage(_ c: Checks) {
         let k = KeysScene()
-        let down = PoseValue.scalar(2), up = PoseValue.scalar(0)
+        let down = PoseValue.scalar(3), up = PoseValue.scalar(0)
+        let left = s(0x7B, [.control, .option])
+        c.expect(k.configure(left, title: "Left Half", done: false), "P7 configured")
+        c.expect(!k.configure(left, title: "Left Half", done: false), "P7 the same step is not rebuilt")
+        c.expect(k.accessibilityLabel == "Keys to press: Control Option Left Arrow, Left Half", "P7 VoiceOver reads the keys and the step (\(k.accessibilityLabel))")
         let ctrl = k.heldPose([.control])
         c.expect(ctrl["c.cap0", "transform.translation.y"] == down && ctrl["c.wash0", "opacity"] == .scalar(1)
                  && ctrl["c.cap1", "transform.translation.y"] == up && ctrl["c.cap2", "transform.translation.y"] == up,
                  "P7 ⌃ held: the ⌃ keycap is down, ⌥ and the arrow are up")
         let habit = k.heldPose([.option, .command])
         c.expect(habit["c.cap0", "transform.translation.y"] == up && habit["c.cap1", "transform.translation.y"] == down,
-                 "P7 ⌥⌘ held on a ⌃⌥ set: only ⌥ shows down")
-        k.configure(modifiers: [.option, .command], actionKeys: ["←", "→", "F", "Y"])
+                 "P7 ⌥⌘ held on a ⌃⌥ step: only ⌥ shows down")
+        guard let guide = k.guideTimeline else { c.expect(false, "P7 a step has a guide"); return }
+        c.expect(guide.pose(at: 0) == guide.pose(at: guide.duration), "P7 guide: loop seam")
+        c.expect(guide.pose(at: guide.restT)["c.cap2", "transform.translation.y"] == up && guide.pose(at: guide.explainT)["c.cap2", "transform.translation.y"] == down,
+                 "P7 guide: keys up at rest, down in the explain pose")
+        let arrive = k.arriveTimeline
+        c.expect(arrive.pose(at: 0)["c.group", "opacity"] == .scalar(0) && arrive.restPose["c.group", "opacity"] == .scalar(1), "P7 the next step fades in")
+        k.configure(s(0x7B, [.option, .command]), title: "Left Half", done: false)
         let both = k.heldPose([.option, .command])
-        c.expect(both["c.cap0", "transform.translation.y"] == down && both["c.cap1", "transform.translation.y"] == down, "P7 ⌥⌘ set: both caps down")
-        for action in KeysScene.actions {
-            guard let t = k.guideTimeline(action) else { c.expect(false, "P7 \(action.title) has a guide"); continue }
-            c.expect(t.pose(at: 0) == t.pose(at: t.duration), "P7 \(action.title) guide: loop seam")
-            c.expect(t.pose(at: t.restT)["c.cap0", "transform.translation.y"] == up && t.pose(at: t.explainT)["c.cap0", "transform.translation.y"] == down,
-                     "P7 \(action.title) guide: keys up at rest, down in the explain pose")
-        }
-        c.expect(k.guideTimeline(.center) == nil, "P7 no guide for an action the scene does not show")
+        c.expect(both["c.cap0", "transform.translation.y"] == down && both["c.cap1", "transform.translation.y"] == down, "P7 ⌥⌘ step: both caps down")
+        k.configure(nil, title: "All set", done: true)
+        c.expect(k.guideTimeline == nil && k.accessibilityLabel == "All set", "P7 done: no keys, nothing loops")
     }
 
     // MARK: P8

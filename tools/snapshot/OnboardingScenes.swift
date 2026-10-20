@@ -57,10 +57,9 @@ private func checkOnboardingTimelines() {
         (drag.timeline(stageOrigin: CGPoint(x: 40, y: 40), slot: CGPoint(x: 150, y: 290)), false),
         (drag.timeline(stageOrigin: CGPoint(x: 40, y: 40), slot: CGPoint(x: 150, y: 290), replay: true), false),
     ]
-    for action in KeysScene.actions {
-        if let t = keys.guideTimeline(action) { timelines.append((t, true)) }
-        if let t = keys.mirrorTimeline(action, cycle: 1, press: true) { timelines.append((t, false)) }
-    }
+    keys.configure(Shortcut(keyCode: 0x7B, mods: NoktaMods([.control, .option]).rawValue), title: "Left Half", done: false)
+    if let guide = keys.guideTimeline { timelines.append((guide, true)) }
+    timelines.append((keys.arriveTimeline, false))
     for rm in [false, true] {
         let progress = [ProgressSegments.id(1): (from: red, to: ink)]
         timelines.append((OnboardingTimelines.page(forward: true, progress: progress, reds: 1, reduceMotion: rm), false))
@@ -240,8 +239,8 @@ func snapshotOnboarding(trusted: Bool) {
     }
     if trusted {
         // The practice on screen 3 (synthetic keys and events; the inert core moved nothing): ⌃⌥
-        // held; ⌥⌘← from another set's habit; ⌃⌥← done and ⌃⌥→ twice (Scene C shows Right ⅔); all
-        // four done.
+        // held; ⌥⌘← from another set's habit; Left and Right done (Scene C shows ⌃⌥↩); all four
+        // done (All set.).
         onboarding.showScreen(2)
         func snap(_ action: NoktaAction, cycle: UInt32 = 0) {
             onboarding.noteSnap(NoktaEvent(kind: .snapped, action: action, zone: nil, source: .keyboard, result: .ok,

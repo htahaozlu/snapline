@@ -141,7 +141,7 @@ Bench/preview modlarıyla, yalnız Nokta'nın kendi pencereleri üzerinde; ekran
 - [ ] (**UNVERIFIED**) menüde Türkçe Q `İ` (0x27): AppKit key equivalent'ı büyük harfe Türkçe yerel ayarsız çevirirse `I` görünebilir; Settings ve VoiceOver `İ` der.
 
 ### 2026-10-20 doğrulamaları (0.4.0: alıştırma ekranı, Option-Command seti, DMG penceresi)
-- [x] `zig build test` geçer · `check-stubs` OK · `snapshot.sh`: self-test 3228, keyboard-test 157, recovery-test 43, practice-test 128, settings 27, onboarding timelines 2087 (rehber döngüleri dahil).
+- [x] `zig build test` geçer · `check-stubs` OK · `snapshot.sh`: self-test 3228, keyboard-test 157, recovery-test 43, practice-test 129, settings 27, onboarding timelines 1606 (0.4.1: sahne C yalnız tuşlar — minyatür pencere ve ayna segmentleri kalktı).
 - [x] Testler gerçekten yakalıyor: 9 bozma tek tek denendi, 9'u da practice-test'i düşürdü (uygulama kapanınca yeniden bağlamama, ⌘ komutlarını yorumlama, izinsiz alıştırma, ekran 3 dışında kalan tuş izleyicisi, yazılmayan `practiceSeen`, seçilmiş seti ezen tanıdık set, her hatayı sayma, ⌥⌘D'ye düşen üçte birler, boşta devam etmeyen rehber).
 - [x] `scripts/a11y-audit.sh` gerçek sistemde: 8 yüzey, 144 etkileşimli öğe, 0 isimsiz.
 - [x] Boyut: arm64 842,096 B (≤ 850 kB), bundle 936 kB — BENCHMARKS.md 2026-10-20.

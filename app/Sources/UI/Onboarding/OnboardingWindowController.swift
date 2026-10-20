@@ -79,12 +79,10 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     /// Access arrived while screen 2 was not visible: E plays when it is.
     private var grantPending = false
     private var grantPlaying = false
-    /// Screen 3 has been current: from then on real snaps move Scene C's window too.
+    /// Screen 3 has been current (closing the window then counts as having practised).
     private var tryShown = false
     /// Scene C plays the guide for the next step.
     private var guidePlaying = false
-    /// The last snap Scene C showed (its key stays on the action keycap once all four are done).
-    private var lastMirrored: NoktaAction?
 
     // MARK: practice state (screen 3)
 
@@ -469,16 +467,21 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         showAccessState(force: false)
         tryPage.update(prefs: app.prefs)
         refreshPracticeLine()
-        let shortcuts = KeysScene.actions.map { app.prefs.shortcut(for: $0) ?? $0.defaultShortcut }
-        keys.configure(modifiers: shortcuts.first??.modifiers ?? [.control, .option],
-                       actionKeys: shortcuts.map { s in s.map { KeyNames.name(for: $0.keyCode) } ?? "" })
+        configureKeys()
+    }
+
+    /// Scene C shows the step to press next (all done: `All set.`); true if that changed.
+    @discardableResult
+    private func configureKeys() -> Bool {
+        guard let target = tryPage.target else { return keys.configure(nil, title: "All set", done: true) }
+        return keys.configure(app.prefs.shortcut(for: target), title: target.title, done: false)
     }
 
     private func preferencesChanged() {
-        let before = (keys.modifiers, keys.actionKeys)
+        let before = (keys.shortcut, keys.title)
         updateCurrentPage()
-        // New shortcuts mean new keys in Scene C: start its demo over with them.
-        guard (keys.modifiers, keys.actionKeys) != before, currentIndex == 2, !transitioning else { return }
+        // New shortcuts mean new keys in Scene C: start its guide over with them.
+        guard (keys.shortcut, keys.title) != before, currentIndex == 2, !transitioning else { return }
         if gate.isOpen, !practicePaused { playGuide() } else { showStatic() }
     }
 
@@ -611,10 +614,10 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         case 1:
             permission.show(trusted && !grantPending ? AccessScene.granted.restPose : AccessScene.waiting.restPose)
         default:
-            if !practicePaused, let target = tryPage.target, let guide = keys.guideTimeline(target) {
+            if !practicePaused, let guide = keys.guideTimeline {
                 keys.show(rm ? guide.pose(at: guide.explainT) : guide.restPose)
             } else {
-                keys.show(keys.restingPose(tryPage.target ?? lastMirrored).merging(keys.heldPose(heldChord)))
+                keys.show(keys.restPose.merging(keys.heldPose(heldChord)))
             }
         }
     }
@@ -638,9 +641,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             if trusted { return AccessScene.granted.restPose }
             return willPlay ? AccessScene.waiting.pose(at: 0) : AccessScene.waiting.restPose
         default:
-            guard !practicePaused, let target = tryPage.target, let guide = keys.guideTimeline(target) else {
-                return keys.restingPose(tryPage.target ?? lastMirrored)
-            }
+            guard !practicePaused, let guide = keys.guideTimeline else { return keys.restPose }
             return willPlay ? guide.pose(at: 0) : guide.pose(at: gate.reduceMotion ? guide.explainT : guide.restT)
         }
     }
@@ -673,9 +674,9 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    /// Scene C guides the next step (nothing left to try: the window rests where the user put it).
+    /// Scene C's keys press on a loop (nothing left to try: `All set.` stays still).
     private func playGuide() {
-        guard let target = tryPage.target, let guide = keys.guideTimeline(target) else {
+        guard let guide = keys.guideTimeline else {
             stopMotion()
             return
         }
@@ -850,11 +851,12 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     /// The modifiers held that make a chord (⇧ alone is typing, not a shortcut).
     private var heldChord: NoktaMods { held.intersection([.control, .option, .command]).isEmpty ? [] : held }
 
-    /// The practice line: the held keys while no press has answered them, else the last press's
-    /// outcome, else the step (or what stands in its way).
+    /// The practice line: held modifiers the step does not use (the right ones show on the
+    /// keycaps alone), else the last press's outcome, else the step (or what stands in its way).
     func refreshPracticeLine() {
         guard tryPage != nil else { return }
-        if trusted, !heldChord.isEmpty, !resultSinceHold {
+        let wanted = tryPage.target.flatMap { app.prefs.shortcut(for: $0) }?.modifiers ?? []
+        if trusted, !heldChord.isEmpty, !resultSinceHold, !wanted.isSuperset(of: heldChord) {
             tryPage.show(.holding(heldChord, tryPage.target))
         } else if trusted, let lastResult {
             tryPage.show(lastResult)
@@ -960,42 +962,41 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     /// Called for every snapped and failed event (via the .noktaDidSnap broadcast). A snap ticks
     /// its chip from any screen. On screen 3 it is a practice step: the line says it worked and
-    /// names the next one, and Scene C plays the user's own snap (the keys press only if it came
-    /// from the keyboard). A failed shortcut there says why nothing moved; Restore with nothing to
-    /// put back still counts — the shortcut reached Snapline.
+    /// names the next one, and Scene C brings in the next step's keys. A failed shortcut there says
+    /// why nothing moved; Restore with nothing to put back still counts — the shortcut reached
+    /// Snapline.
     func noteSnap(_ event: NoktaEvent) {
         guard let action = event.action, tryPage != nil else { return }
         let onTry = currentIndex == 2 && !transitioning
         let practised = TryPage.tryActions.contains { $0.0 == action }
+        let status: PracticeStatus
         if event.kind == .failed {
             guard onTry, practised, event.source == .keyboard else { return }
-            if action == .restore, event.result == .invalid {
-                _ = tryPage.markTried(.restore)
-                tryPage.update(prefs: app.prefs)
-                note(.nothingToRestore)
-            } else {
+            guard action == .restore, event.result == .invalid else {
                 note(.failed(action, event.result))
+                return
             }
-            return
+            status = .nothingToRestore
+        } else {
+            guard event.kind == .snapped else { return }
+            status = .worked(action, keyboard: event.source == .keyboard, next: nil)
         }
-        guard event.kind == .snapped else { return }
         _ = tryPage.markTried(action)
         tryPage.update(prefs: app.prefs)
-        guard tryShown, practised else { return }
-        let press = event.source == .keyboard
-        let mirror = keys.mirrorTimeline(action, cycle: event.cycle, press: press)
-        if onTry { note(.worked(action, keyboard: press, next: tryPage.target)) }
-        guard let mirror else { return }
-        keys.settled(after: mirror)
-        keys.mirroring = true
-        lastMirrored = action
+        let arrived = configureKeys()
+        guard onTry, practised else { return }
+        if case .worked(let a, let keyboard, _) = status {
+            note(.worked(a, keyboard: keyboard, next: tryPage.target))
+        } else {
+            note(status)
+        }
+        guard arrived else { return }
         NSAccessibility.post(element: stage, notification: .valueChanged)
-        guard onTry else { return }
         if gate.isOpen {
             for l in keys.allLayers { l.removeAllAnimations() }
-            play([mirror], on: keys.layers) { [weak self] in self?.showHeldKeys() }
+            play([keys.arriveTimeline], on: keys.layers) { [weak self] in self?.showHeldKeys() }
         } else {
-            keys.show(mirror.restPose.merging(keys.heldPose(heldChord))) // Reduce Motion or not visible: at once
+            showStatic() // Reduce Motion or not visible: the next step at once
         }
     }
 
@@ -1011,6 +1012,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     var practiceTarget: NoktaAction? { tryPage.target }
     var heldModifiers: NoktaMods { held }
     var tryScreen: TryPage { tryPage }
+    /// What Scene C shows: the shortcut, its title, and whether it is the closing `All set.`.
+    var stageKeys: (shortcut: Shortcut?, title: String, done: Bool) { (keys.shortcut, keys.title, keys.done) }
     /// What `show()` would start with once on screen 3.
     func testAppear() { pageDidAppear() }
     #endif
@@ -1131,7 +1134,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             activeStoryboard = (AccessScene.waiting, permission.layers, [:], {})
         case .keys:
             go(to: 2, animated: false)
-            activeStoryboard = (keys.guideTimeline(tryPage.target ?? .leftHalf)!, keys.layers, [:], {})
+            activeStoryboard = (keys.guideTimeline ?? keys.arriveTimeline, keys.layers, [:], {})
         case .grant:
             go(to: 1, animated: false)
             access.showWaiting()
