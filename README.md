@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <strong>Prefer Homebrew?</strong> <code>brew install --cask htahaozlu/snapline/snapline</code>
+  <strong>Prefer Homebrew?</strong> <code>brew tap htahaozlu/snapline && brew install --cask htahaozlu/snapline/snapline</code>
 </p>
 
 <p align="center">
@@ -107,11 +107,15 @@
 ### Homebrew
 
 ```bash
+brew tap htahaozlu/snapline
 brew install --cask htahaozlu/snapline/snapline
 ```
 
-`brew` taps `htahaozlu/homebrew-snapline` the first time. Upgrade with
-`brew upgrade --cask htahaozlu/snapline/snapline`.
+Current Homebrew installs from a third-party tap only after you tap it. Always use the full name
+`htahaozlu/snapline/snapline`: Homebrew's own repository has an unrelated cask called `snapline` (a
+screenshot tool), and the short name installs that one. Upgrade with `brew upgrade --cask
+htahaozlu/snapline/snapline` (a plain `brew upgrade` keeps to this tap too). Already installed from the
+DMG? Add `--force` to the install to let Homebrew take it over.
 
 ### First launch: one permission
 

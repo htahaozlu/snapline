@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <strong>Homebrew mu?</strong> <code>brew install --cask htahaozlu/snapline/snapline</code>
+  <strong>Homebrew mu?</strong> <code>brew tap htahaozlu/snapline && brew install --cask htahaozlu/snapline/snapline</code>
 </p>
 
 <p align="center">
@@ -88,8 +88,15 @@
 ### Homebrew
 
 ```bash
+brew tap htahaozlu/snapline
 brew install --cask htahaozlu/snapline/snapline
 ```
+
+Güncel Homebrew üçüncü taraf tap'ten ancak tap eklendikten sonra kurar. Her zaman tam adı
+`htahaozlu/snapline/snapline` kullanın: Homebrew'ün kendi deposunda ilgisiz bir `snapline` cask'ı (ekran
+görüntüsü aracı) var; kısa ad onu kurar. Güncelleme: `brew upgrade --cask htahaozlu/snapline/snapline`
+(düz `brew upgrade` da bu tap'e bağlı kalır). DMG'den kurduysanız Homebrew'ün devralması için kuruluma
+`--force` ekleyin.
 
 ### İlk açılış: tek izin
 
