@@ -7,7 +7,7 @@ import AppKit
 // Output (per appearance):
 //   onboarding-<1..3>[-granted]-<mode>.png           each screen at rest, without and with access
 //   onboarding-<1..3>[-granted]-a11y-<mode>.png      the same with Increase Contrast + Differentiate Without Color
-//   onboarding-3-voiceover-<mode>.png                screen 3 with VoiceOver's shortcut-set row
+//   onboarding-3-practice-<state>-<mode>.png         screen 3 while practising (held, habit, tried, done)
 //   onboarding-<A|B|C|E>-t<ms>-<mode>.png            storyboard frames (design-v2-opus.md §3.6 tables)
 //   onboarding-D-<1to2|2to3>-t<ms>-<mode>.png        page transition frames
 //   onboarding-<A|B|C|D|E>-rm-<mode>.png             the Reduce Motion pose
@@ -19,7 +19,7 @@ private typealias Storyboard = OnboardingWindowController.Storyboard
 private let storyboardTimes: [(id: String, storyboard: Storyboard, times: [Double])] = [
     ("A", .drag, [0, 300, 450, 850, 930, 1200, 1500, 1580, 1660, 1750, 1900, 1940, 1980, 2040, 2160, 2200, 2400, 2600, 2700]),
     ("B", .access, [0, 150, 450, 750, 830, 930, 1030, 1500, 2400, 2600, 2700, 2850, 3000, 3200]),
-    ("C", .keys, [0, 50, 100, 150, 200, 260, 360, 400, 1000, 1100, 1150, 2100, 2150, 3100, 3150, 4000]),
+    ("C", .keys, [0, 300, 600, 650, 700, 750, 800, 860, 900, 1000, 1500, 2400]),
     ("E", .grant, [0, 60, 120, 160, 240, 300, 400, 480, 530, 580, 1800, 1950, 2100]),
 ]
 private let pageTimes: [Double] = [0, 40, 80, 120, 160, 200, 240, 280, 320]
@@ -53,11 +53,12 @@ private func checkOnboardingTimelines() {
     let drag = DragScene(), keys = KeysScene()
     let ink = CGColor(gray: 0, alpha: 1), red = CGColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)
     var timelines: [(Timeline, looping: Bool)] = [
-        (AccessScene.waiting, true), (AccessScene.granted, false), (keys.loopTimeline, true),
+        (AccessScene.waiting, true), (AccessScene.granted, false),
         (drag.timeline(stageOrigin: CGPoint(x: 40, y: 40), slot: CGPoint(x: 150, y: 290)), false),
         (drag.timeline(stageOrigin: CGPoint(x: 40, y: 40), slot: CGPoint(x: 150, y: 290), replay: true), false),
     ]
     for action in KeysScene.actions {
+        if let t = keys.guideTimeline(action) { timelines.append((t, true)) }
         if let t = keys.mirrorTimeline(action, cycle: 1, press: true) { timelines.append((t, false)) }
     }
     for rm in [false, true] {
@@ -93,10 +94,15 @@ private func checkOnboardingTimelines() {
         if looping {
             expect(t.pose(at: 0) == t.pose(at: t.duration), "\(n): loop seam pose(0) == pose(duration)")
             let anims = t.animations(begin: 0, loops: Theme.Motion.maxLoops)
-            expect(anims.contains { $0.key == "nokta.tail" }, "\(n): a tail to restT after the loops")
+            if t.restT > 0 {
+                expect(anims.contains { $0.key == "nokta.tail" }, "\(n): a tail to restT after the loops")
+            } else {
+                // Rest on the seam (Scene C's guide): the loops end on it, no tail is needed or made.
+                expect(t.restPose == t.pose(at: t.duration) && !anims.contains { $0.key == "nokta.tail" }, "\(n): rest on the seam, no tail")
+            }
         }
     }
-    let a = timelines[3].0
+    let a = timelines[2].0 // Scene A
     expect(a.pose(at: 0)[OnboardingLayer.wordmarkPeriod, "opacity"] == .scalar(0)
            && a.restPose[OnboardingLayer.wordmarkPeriod, "opacity"] == .scalar(1)
            && a.restPose[OnboardingLayer.flightPeriod, "opacity"] == .scalar(0), "A: the wordmark gets its period only when it lands")
@@ -106,7 +112,7 @@ private func checkOnboardingTimelines() {
     // of the text's end, so it never crosses the title's glyphs; title and body show one text at a time.
     typealias GrantID = OnboardingTimelines.GrantID
     let page = AccessPage(frame: CGRect(x: OnboardingMetrics.columnX, y: OnboardingMetrics.pageTop, width: OnboardingMetrics.columnWidth,
-                                        height: OnboardingMetrics.pageHeight(voiceOver: false)))
+                                        height: OnboardingMetrics.pageHeight))
     let e = OnboardingTimelines.grant(from: page.statusDotInSuperview, to: page.slotInSuperview, titleSize: page.titleSize,
                                       red: red, ink: ink, reduceMotion: false)
     let line = page.titleGranted.frame.offsetBy(dx: page.frame.minX, dy: page.frame.minY)
@@ -230,27 +236,34 @@ func snapshotOnboarding(trusted: Bool) {
             }
             gifs["D-\(mode)"] = frames
             reduced("D", .page(from: 0, to: 1))
-
-            onboarding.voiceOverOverride = true
-            onboarding.showScreen(2)
-            write(shot(), "onboarding-3-voiceover-\(mode)")
-            onboarding.voiceOverOverride = false
         }
     }
     if trusted {
-        // Mirror mode after two real snaps on screen 3 (synthetic events; the inert core moved
-        // nothing): the chips tick and Scene C shows the last one — Right ⅔ by a repeated ⌃⌥→.
+        // The practice on screen 3 (synthetic keys and events; the inert core moved nothing): ⌃⌥
+        // held; ⌥⌘← from another set's habit; ⌃⌥← done and ⌃⌥→ twice (Scene C shows Right ⅔); all
+        // four done.
         onboarding.showScreen(2)
-        for (action, cycle) in [(NoktaAction.leftHalf, UInt32(0)), (.rightHalf, 1)] {
+        func snap(_ action: NoktaAction, cycle: UInt32 = 0) {
             onboarding.noteSnap(NoktaEvent(kind: .snapped, action: action, zone: nil, source: .keyboard, result: .ok,
                                            displayID: CGMainDisplayID(), cycle: cycle, rect: .zero, latencyNs: 0,
                                            frameDiffers: false, sizeRefused: false, drop: false))
         }
-        for (mode, appearance) in appearances {
-            window.appearance = appearance
-            onboarding.refreshAppearance()
-            onboarding.showScreen(2)
-            write(renderCached(content, appearance: appearance, scale: 2), "onboarding-3-granted-tried-\(mode)")
+        let states: [(String, () -> Void)] = [
+            ("held", { onboarding.testPracticeFlags([.control, .option]) }),
+            ("habit", {
+                onboarding.testPracticeFlags([])
+                onboarding.testPracticePress(Shortcut(keyCode: 0x7B, mods: NoktaMods([.option, .command]).rawValue))
+            }),
+            ("tried", { snap(.leftHalf); snap(.rightHalf); snap(.rightHalf, cycle: 1) }),
+            ("done", { snap(.maximize); snap(.restore) }),
+        ]
+        for (name, act) in states {
+            act()
+            for (mode, appearance) in appearances {
+                window.appearance = appearance
+                onboarding.refreshAppearance()
+                write(renderCached(content, appearance: appearance, scale: 2), "onboarding-3-practice-\(name)-\(mode)")
+            }
         }
     }
     for (name, frames) in gifs.sorted(by: { $0.key < $1.key }) {

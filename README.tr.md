@@ -69,7 +69,8 @@
 |---|---|
 | **Sürükle-bırak** | Kenarlar yarılar, köşeler çeyrekler, üst kenar büyütme, alt kenar üç parçada üçte birler. <kbd>⇧</kbd> ile alternatif harita. Her bölge yeniden atanabilir. Yerleştirilmiş pencereyi sürükleyince eski boyutuna döner. |
 | **20 klavye eylemi** | Yarılar, çeyrekler, üçte birler, üçte ikiler, büyütme, neredeyse büyütme, ortalama, geri alma, sonraki / önceki ekran. Aynı yarıya tekrar basınca ½ → ⅔ → ⅓. |
-| **İki kısayol seti** | *Classic* (<kbd>⌃⌥</kbd>, topluluk standardı) ve *Alternate* (<kbd>⌃⇧⌘</kbd>, VoiceOver'ın <kbd>⌃⌥</kbd>'sine hiç dokunmaz). Ya da kendi kısayollarınız. |
+| **Üç kısayol seti** | *Classic* (<kbd>⌃⌥</kbd>, topluluk standardı), *Option-Command* (<kbd>⌥⌘</kbd>, Spectacle ve Tiles düzeni — biri kuruluysa kendiliğinden seçilir) ve *Alternate* (<kbd>⌃⇧⌘</kbd>, VoiceOver'ın <kbd>⌃⌥</kbd>'sine hiç dokunmaz). Ya da kendi kısayollarınız. |
+| **Yerleşik alıştırma** | Kurulumun son ekranı kısa bir alıştırma: bastığınız tuşları gösterir, Snapline'a ulaşan her kısayolu işaretler, ulaşmayanın nedenini söyler. Settings › Shortcuts › **Practice…** ile her zaman yeniden açılır. |
 | **Sizin klavye düzeniniz** | Kısayol bir tuş konumudur; düzen değişince de çalışır. Gösterilen ad ise yazdığınız düzenden gelir (Türkçe Q'da `⌃⇧⌘Ü`, US'de `⌃⇧⌘]`). |
 | **Sakin geri bildirim** | Klavyeyle yerleştirmede kısa bir parlama ve isteğe bağlı etiket; ses varsayılan kapalı; trackpad'de dokunsal geri bildirim. |
 | **Ayak altında dolaşmaz** | Boşluklar, uygulama hariç tutma, girişte açılma, menü çubuğundan duraklatma. Uyku, kullanıcı değişimi ve Accessibility değişikliklerinden sonra kendini yeniden kurar. |
@@ -94,21 +95,38 @@ brew install --cask htahaozlu/snapline/snapline
 
 Snapline menü çubuğunda yaşar ve yalnız **Accessibility** (Erişilebilirlik) iznini ister — macOS'un başka
 uygulamaların pencerelerini okuma ve taşıma izni. Input Monitoring yok, Screen Recording yok, hiçbir
-şey Mac'inizden çıkmaz. *Later* derseniz Snapline kullanılabilir kalır: menü çubuğu ikonu eksik izni
+şey Mac'inizden çıkmaz.
+
+Son ekran bir alıştırma. Snapline sıradaki kısayolu çerçeveler, tuttuğunuz değiştiricileri tuşların
+üstünde gösterir, gelip pencereyi taşıyan her kısayolu işaretler; bir basış başka yere giderse nereye
+gittiğini söyler: <kbd>⌥⌘←</kbd> *Option-Command* setinindir (tek tıkla geçilir), Tiles açık ve tuşu
+tutuyor, ya da tuş Snapline yerine pencereye ulaştı. Siz bastıkça demo bekler, birkaç saniye sessizlikten
+sonra devam eder.
+
+*Later* derseniz Snapline kullanılabilir kalır: menü çubuğu ikonu eksik izni
 gösterir, menü **Allow Accessibility…** ile başlar. İzni sonradan kapatırsanız Snapline bunu bir saniye
 içinde fark eder; geri açınca tüm kısayollar yeniden başlatma gerekmeden döner.
 
 ## Kısayollar
 
-| Eylem | Classic | Alternate |
-|---|---|---|
-| Sol / Sağ / Üst / Alt yarı | <kbd>⌃⌥</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> |
-| Çeyrekler | <kbd>⌃⌥</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> |
-| Birinci / Orta / Son üçte bir | <kbd>⌃⌥</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> |
-| Birinci / Orta / Son üçte iki | <kbd>⌃⌥</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> |
-| Büyüt / Neredeyse büyüt | <kbd>⌃⌥↩</kbd> / <kbd>⌃⌥⇧↩</kbd> | <kbd>⌃⇧⌘↩</kbd> / <kbd>⌃⇧⌘M</kbd> |
-| Ortala / Geri al | <kbd>⌃⌥C</kbd> / <kbd>⌃⌥⌫</kbd> | <kbd>⌃⇧⌘C</kbd> / <kbd>⌃⇧⌘⌫</kbd> |
-| Sonraki / Önceki ekran | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⇧⌘]</kbd> / <kbd>⌃⇧⌘[</kbd> |
+| Eylem | Classic | Option-Command | Alternate |
+|---|---|---|---|
+| Sol / Sağ / Üst / Alt yarı | <kbd>⌃⌥</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌥⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> |
+| Çeyrekler | <kbd>⌃⌥</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌥⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> |
+| Birinci / Orta / Son üçte bir | <kbd>⌃⌥</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⇧⌥⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> |
+| Birinci / Orta / Son üçte iki | <kbd>⌃⌥</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> | <kbd>⌃⌘</kbd> <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> |
+| Büyüt / Neredeyse büyüt | <kbd>⌃⌥↩</kbd> / <kbd>⌃⌥⇧↩</kbd> | <kbd>⌥⌘F</kbd> / <kbd>⇧⌥⌘↩</kbd> | <kbd>⌃⇧⌘↩</kbd> / <kbd>⌃⇧⌘M</kbd> |
+| Ortala / Geri al | <kbd>⌃⌥C</kbd> / <kbd>⌃⌥⌫</kbd> | <kbd>⌥⌘C</kbd> / <kbd>⌥⌘Y</kbd> | <kbd>⌃⇧⌘C</kbd> / <kbd>⌃⇧⌘⌫</kbd> |
+| Sonraki / Önceki ekran | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⇧⌘]</kbd> / <kbd>⌃⇧⌘[</kbd> |
+
+**Spectacle ya da Tiles'tan mı geliyorsunuz?** *Option-Command* onların düzeni (<kbd>⌥⌘D</kbd> Dock'ta
+kalır, bu yüzden üçte birlere <kbd>⇧</kbd> eklenir); Snapline bunlardan biri kuruluysa bu setle başlar.
+Diğer uygulamadan çıkın: aynı tuşlarda iki pencere yöneticisi olunca biri basışı hiç almaz.
+
+**Kısayola basıyorum, hiçbir şey olmuyor.** Settings › Shortcuts › **Practice…** açıp orada basın.
+Alıştırma basışın ne olduğunu söyler: başka bir setin kısayolu (seti orada değiştirin), başka bir
+uygulamanın tuttuğu tuş (Tiles, Spectacle, Rectangle, Magnet ya da Moom açıksa adını verir) ya da
+Snapline yerine pencereye ulaşan bir tuş.
 
 ### Kısayol kaydetmek — faresiz
 

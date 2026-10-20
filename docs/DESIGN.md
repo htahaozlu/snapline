@@ -275,12 +275,12 @@ v1 ile aynıdır: kodla sentez, varsayılan kapalı, `tick` / `tick.soft` / `thu
 - Tablo 300 pt yükseklikte ve kayar; satır 28 pt.
   - Grup satırları: HALVES · QUARTERS · THIRDS · SIZE · DISPLAY.
   - Her satır: glif + ad + ShortcutRecorder (150 × 24) + temizle butonu.
-- `Shortcut set` [Classic ⌃⌥ | Alternate ⌃⇧⌘]; altında `Alternate avoids the VoiceOver keys.`
+- `Shortcut set` [⌃⌥ | ⌥⌘ | ⌃⇧⌘] (adlar tooltip'te); altında `⌃⌥ Classic. ⌥⌘ as in Spectacle and Tiles. ⌃⇧⌘ avoids the VoiceOver keys.`
 - `Repeat to cycle ½ ⅔ ⅓` (switch).
 - `Flash after snap` (switch).
 - `Almost Maximize`: slider 50–100, 11 tik, okuma digits ile (`90 %`).
 - `Keep ⌃⌥ with VoiceOver`: yalnız VoiceOver açıksa ya da switch açıksa görünür. Altında `For Caps Lock as VO key.`; askıdayken bunun yerine `⌃⌥ shortcuts paused.`
-- [Restore Defaults]. Özel (hiçbir sete uymayan) kısayollar varken önce sorar: `Restore the default shortcuts?` / `This replaces your custom shortcuts.` [Restore] [Cancel]; bir setten (Alternate) dönüşte sormaz.
+- [Restore Defaults] [Practice…]. Practice onboarding'in alıştırma ekranını açar (izin varsa doğrudan ekran 3). Restore Defaults: özel (hiçbir sete uymayan) kısayollar varken önce sorar: `Restore the default shortcuts?` / `This replaces your custom shortcuts.` [Restore] [Cancel]; bir setten (Alternate) dönüşte sormaz.
 - **ShortcutRecorder.** Kayıt modunda R2 noktası ve `Type shortcut…` görünür. Klavye sözleşmesi:
   - Space / Return (satırda veya odaklı recorder'da) kaydı başlatır; yalnız Nokta'nın key penceresinde (başka yerde tuş gelmez, kısayollar boşuna askıda kalırdı).
   - Esc (değiştiricili de) iptal eder, eski kısayol kalır; VoiceOver `Cancelled. Left Half is still …` der.
@@ -408,7 +408,7 @@ Bütün yüzeylerin metni `design-v2-opus.md` §Metin tablolarındaki v2 sütunu
 ## 11. Onboarding
 
 **Genel:**
-- **3 ekran.** Pencere 560 × 440: titled, closable, fullSizeContentView, şeffaf titlebar; zemin `paper`. Açıkken `.regular`, kapanınca `.accessory` (v1).
+- **3 ekran.** Pencere 560 × 472 (0.4.0: ekran 3'ün alıştırma satırı, set seçici ve `Open at login` için bir satır daha; VoiceOver'a göre boy değişmez): titled, closable, fullSizeContentView, şeffaf titlebar; zemin `paper`. Açıkken `.regular`, kapanınca `.accessory` (v1).
 - **Sahne kalıcı.** Üstte 480 × 200 Stage durur (r 12, `paper.raised`, hairline). Ekranlar arasında yalnız sahnenin *içeriği* değişir; çerçeve hiç kıpırdamaz. Metin sütunu kayar.
 - **Alt bar:** solda ilerleme, 3 segment (20 × 3 pt, r 1.5, aralık 6; tamamlanan ve şimdiki `ink`, sıradaki `ink.3`; VoiceOver `Step 2 of 3`). Sağda butonlar.
 - **Klavye:** Return primary, ⌘[ Back, Esc/⌘W Later. Sahneye tıklamak ya da Full Keyboard Access açıkken Space, sahneyi yeniden oynatır.
@@ -418,9 +418,18 @@ Bütün yüzeylerin metni `design-v2-opus.md` §Metin tablolarındaki v2 sütunu
 |---|---|---|---|---|
 | 1 Welcome | A sürükle-oturt (bir kez; tıklayınca yeniden) | yazı markası `nokta.` (noktası sahneden uçarak gelir) · `Drag a window to an edge, or press a shortcut.` | — | `Continue` |
 | 2 Access | B izin anahtarı (beklerken ≤ 3 döngü + kuyruk) | `Allow Accessibility` · `Nokta needs it to move windows. Nothing leaves your Mac.` | Solda ● `Waiting…` (R4); sağda `Not working?` (NSPopover: `Remove Nokta with −, then add it again.`) | `Open System Settings` (Back ve Later görünür). İzin gelince `Continue` olur, Later gizlenir. |
-| 3 Try | C tuş demosu (≤ 3 döngü, sonra ayna) | `Try a shortcut` · 4 chip: `⌃⌥← Left`, `⌃⌥→ Right`, `⌃⌥↩ Maximize`, `⌃⌥⌫ Restore` (denenince ✓) · `This window moves. Nokta stays in the menu bar` + gerçek menü bar ikonu satır içinde (18 pt) | `Open at login` (switch, varsayılan açık); VoiceOver açıksa `Alternate shortcuts, for VoiceOver.` + set seçici | `Done` |
+| 3 Try (alıştırma) | C rehber: sıradaki adımın tuşları basar, pencere oturur (2400 ms döngü, ≤ 3); kullanıcı basınca durur, 6 s sessizlikten sonra sıradaki adım için yeniden | `Try a shortcut` · 4 chip: `⌃⌥← Left`, `⌃⌥→ Right`, `⌃⌥↩ Maximize`, `⌃⌥⌫ Restore` (sıradaki ink çerçeveli, VoiceOver `next`; denenince ✓) · alıştırma satırı (aşağıda) | `Shortcuts` [Classic ⌃⌥ \| Option-Command ⌥⌘ \| Alternate ⌃⇧⌘] (her zaman); `Open at login` (switch, varsayılan açık) | `Done` |
 
-- **İzinsiz ekran 3:** gövdenin ilk cümlesi `Shortcuts start after you allow access.` olur.
+- **İzinsiz ekran 3:** alıştırma satırı `Shortcuts start after you allow access. Snapline stays in the menu bar` + ikon; tuşlar hiçbir şeyi değiştirmez, chip çerçevelenmez.
+- **Alıştırma satırı** (ekran 3; tuşlar keycap 13 ink, metin body secondary; VoiceOver tuşları heceler, yalnız sonuçlar duyurulur):
+  - Adım: `Press ⌃⌥← to move this window left.` (→ `to move it right`, ↩ `to fill the screen`, ⌫ `to put it back`).
+  - Değiştirici basılıyken: `⌃ held. Add ⌥.` · `⌃⌥ held. Now press ←.` · `⌥⌘ held. This set uses ⌃⌥.` Stage'deki tuşlar da basılı görünür (hareketsiz poz).
+  - Snap: `✓ ⌃⌥←. Next, press ⌃⌥→ to move it right.` (sürüklemeyle: `✓ Left Half. …`). Dördü bitince `All four work. Snapline stays in the menu bar` + ikon.
+  - Pencereye ulaşan bir basış (Carbon Snapline'ın kısayollarını uygulamaya hiç ulaştırmaz): başka setin kısayolu `⌥⌘← is Left Half in Option-Command. Choose it below.` · bilinmeyen `⌃K is not a Snapline shortcut. Try ⌃⌥←.` · değiştiricisiz adım tuşu `Hold ⌃⌥ while you press ←.` · Snapline'ın kendi kısayolu `⌃⌥← reached this window, not Snapline: another app has it.` · VoiceOver askısı. ⌘ komutları, Tab, Return, yazı yok sayılır; olay tüketilmez.
+  - Hata: `⌃⌥↩ reached Snapline, but: This window cannot be moved.`; boşta Restore `✓ ⌃⌥⌫ works. There was nothing to put back yet.` (sayılır).
+  - Engel (boşta): kayıtlı olmayan adım `⌃⌥← belongs to Tiles. Quit it, or choose another set.`; çalışan pencere yöneticisi (Tiles, Spectacle, Rectangle, Magnet, Moom) `Tiles is running and answers keys too. Quit Tiles to practise.` Uygulama kapanınca Snapline yalnız alınamayan kısayolları yeniden kaydeder.
+  - Tanıdık set: Tiles ya da Spectacle kurulu, kısayollar dokunulmamış Classic ve VoiceOver kapalıysa ekran 3 Option-Command ile açılır: `Option-Command keys, as in Tiles. Press ⌥⌘← …`.
+- **Bir kez daha:** alıştırmadan önce kurulumu bitirmiş (ya da ekran 3'e varmadan kapatmış) kullanıcıya bir sonraki açılışta onboarding doğrudan ekran 3'te bir kez açılır (`practiceSeen.v1`, ekran 3 görülüp pencere kapanınca yazılır).
 - **İzin algılama v1 ile aynı:** açılışta kontrol, `com.apple.accessibility.api` yayını, `didBecomeActive`, ve 1 Hz yedek timer (tolerance 0.5). Timer yalnız ekran 2 ekrandayken çalışır: uygulama gizli, ekranlar uykuda ya da pencere küçültülmüşken durur (Reduce Motion açıkken de). Başka bir pencerenin altında kalmak onu durdurmaz: kullanıcı izni System Settings'te verirken onboarding genellikle tamamen örtülüdür ve izin geldiği an Nokta öne gelip `Access granted.` anını göstermelidir (OV2V-1; sistem yayını cihazda doğrulanana kadar timer bu yolun güvencesidir). Butona basınca bir kez prompt + deep link.
 - **Ekran açıldığında izin zaten varsa** granted pozu animasyonsuz çizilir.
 - **Ses ve haptik onboarding'den kalktı** (Settings'te).
@@ -441,9 +450,10 @@ Bütün yüzeylerin metni `design-v2-opus.md` §Metin tablolarındaki v2 sütunu
   - 1.8 s sonra nokta red'den ink'e döner. Sahne B anında "açık" pozuna geçer.
   - Zamanlama (inceleme sonrası, OV2-10): başlık sıralı değişir (eski 0–60 çıkar, yeni 60–120 girer), gövde de sıralı (eski 160–240, yeni 240–320); iki metin hiç üst üste binmez. Uçan noktanın yay kontrol noktası `(2·slot.x − dot.x, min(dot.y, slot.y) − 0.9·titleSize)`: nokta başlığın sonunun üstünden geçip yuvaya sağdan iner, başlık gliflerinin üstünden geçmez.
   - Ekran görünmüyorken izin gelirse sahne, ekran görünür olunca oynar. Bu, özel an 2'dir.
-- **C — Tuş demosu** (Opus Storyboard C, 4000 ms döngü, ≤ 3):
-  - Flash O5 stilindedir.
-  - Kullanıcı ilk gerçek snap'i yapınca ayna modu başlar: demo durur, yaptığı eylemin segmenti bir kez oynar ve chip'e ✓ gelir.
+- **C — Alıştırma rehberi** (0.4.0; 2400 ms döngü, ≤ 3; restT 0 = dikiş, explainT 750):
+  - Sıradaki adımın segmenti 600'de başlar: tuşlar iner, pencere 700'de hedefe oturur (O5 flash), tuşlar kalkar; dikiş pencereyi geri koyar.
+  - Gerçek her snap'te (ekran 3 görüldükten sonra) o eylemin segmenti bir kez, pencerenin bulunduğu yerden oynar (ayna); klavyeden gelmediyse tuşlar basmaz.
+  - Herhangi bir tuş rehberi durdurur; 6 s tuşsuz geçince sıradaki adım için yeniden başlar. Reduce Motion: explain pozu, hareket yok.
 - **D — Ekran geçişi** (Opus Storyboard D, 320 ms): eski metin ve sahne içeriği 160 ms'de çıkar; yenisi 80. ms'de başlayıp 240 ms'de girer. Stage çerçevesi sabittir. Reduce Motion'da 150 ms linear çapraz geçiş.
 - **İmleç:** Nokta'nın kendi ok yoludur (12 × 18; yol `design-v2-opus.md` §3.6). Sistem imleci kopyalanmaz.
 

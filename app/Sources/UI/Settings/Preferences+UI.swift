@@ -75,12 +75,13 @@ extension Preferences {
     /// defaults apply again. Onboarding progress and the login item (ServiceManagement state,
     /// not a preference) are kept.
     func resetAllSettings(domain: String? = Bundle.main.bundleIdentifier) {
-        let keepOnboarding = onboardingDone, keepSeen = onboardingSeen
+        let keepOnboarding = onboardingDone, keepSeen = onboardingSeen, keepPractice = practiceSeen
         if let domain, let persisted = defaults.persistentDomain(forName: domain) {
             for key in persisted.keys { defaults.removeObject(forKey: key) }
         }
         invalidateShortcutCache() // the shortcut table was among the removed keys
         onboardingSeen = keepSeen
+        practiceSeen = keepPractice
         onboardingDone = keepOnboarding // posts .noktaPreferencesChanged once
     }
 

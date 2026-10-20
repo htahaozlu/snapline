@@ -1,12 +1,18 @@
 import AppKit
 import QuartzCore
 
-/// First-run onboarding and the Accessibility permission flow (docs/DESIGN.md §11, §14). 560 × 440
+/// First-run onboarding and the Accessibility permission flow (docs/DESIGN.md §11, §14). 560 × 472
 /// on paper: a persistent 480 × 200 stage whose scene changes while its frame never moves, the
 /// text column below it, progress segments bottom left, buttons bottom right. Three screens —
-/// Welcome (Scene A), Access (Scene B, then the access-granted moment E), Try (Scene C) — joined
-/// by the page transition D. Return = primary, ⌘[ = Back, Esc/⌘W = Later; clicking the stage (or
-/// Space on it with Full Keyboard Access) replays its scene.
+/// Welcome (Scene A), Access (Scene B, then the access-granted moment E), Try (Scene C, a
+/// practice) — joined by the page transition D. Return = primary, ⌘[ = Back, Esc/⌘W = Later;
+/// clicking the stage (or Space on it with Full Keyboard Access) replays its scene.
+///
+/// Practice (screen 3): Scene C guides the next step (its keys press, the window lands, on a loop);
+/// a local key monitor, only while that screen is up, shows the modifiers the user holds on the
+/// stage's keycaps and on the practice line, and reads every key press that reaches the window —
+/// Snapline's own shortcuts never do (Carbon takes them), so what arrives is a near miss to explain.
+/// Any key stops the guide; after 6 s without one it plays again for the step that is next.
 ///
 /// Motion follows the `pose(at t)` contract (§5.2): every scene and transition is a `Timeline`
 /// played on the render server, and nothing moves unless the `MotionGate` is open (window
@@ -46,6 +52,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private var trusted = false
     private var didPrompt = false
     private var appliedVoiceOverSet = false
+    private var appliedFamiliarSet = false
     private var trustTimer: Timer?
     private var permissionObservers: [NSObjectProtocol] = []
     private var observers: [NSObjectProtocol] = []
@@ -72,12 +79,32 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     /// Access arrived while screen 2 was not visible: E plays when it is.
     private var grantPending = false
     private var grantPlaying = false
-    /// Screen 3 has been current: from then on a real snap ends its demo (mirror mode).
+    /// Screen 3 has been current: from then on real snaps move Scene C's window too.
     private var tryShown = false
-    /// Scene C after the first real snap: the demo is over, each real action plays its segment.
-    private var mirroring = false
-    private var mirrorPose: Pose?
-    private var lastMirror: (action: NoktaAction, cycle: UInt32, press: Bool)?
+    /// Scene C plays the guide for the next step.
+    private var guidePlaying = false
+    /// The last snap Scene C showed (its key stays on the action keycap once all four are done).
+    private var lastMirrored: NoktaAction?
+
+    // MARK: practice state (screen 3)
+
+    private var practiceMonitor: Any?
+    /// The user pressed something: the guide waits, the stage shows their keys.
+    private var practicePaused = false
+    private var idleResume: DispatchWorkItem?
+    /// The modifiers held now (only while screen 3 is up).
+    private var held: NoktaMods = []
+    /// A press's outcome since the modifiers went down: it stays on the line over "⌃⌥ held".
+    private var resultSinceHold = false
+    /// What the last press did, until the idle timeout.
+    private var lastResult: PracticeStatus?
+    /// Known window managers that run now (they answer keys too).
+    private var runningManagers: [String] = []
+    #if NOKTA_SNAPSHOT
+    /// Offscreen tools: which apps count as installed / running (never this Mac's).
+    var installedOverride: (String) -> Bool = { _ in false }
+    var runningOverride: [String] = [] { didSet { runningManagers = runningOverride; refreshPracticeLine() } }
+    #endif
 
     init(app: AppController) {
         self.app = app
@@ -88,6 +115,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     deinit {
         stopWatchingPermission()
+        if let practiceMonitor { NSEvent.removeMonitor(practiceMonitor) }
+        idleResume?.cancel()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         workspaceObservers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
     }
@@ -95,15 +124,21 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     // MARK: window
 
     #if NOKTA_SNAPSHOT
-    private var voiceOverRow: Bool { voiceOverOverride ?? NSWorkspace.shared.isVoiceOverEnabled }
+    private var voiceOverOn: Bool { voiceOverOverride ?? NSWorkspace.shared.isVoiceOverEnabled }
+    private var otherManagersRunning: [String] { runningOverride }
+    private func isInstalled(_ bundleID: String) -> Bool { installedOverride(bundleID) }
     #else
-    private var voiceOverRow: Bool { NSWorkspace.shared.isVoiceOverEnabled }
+    private var voiceOverOn: Bool { NSWorkspace.shared.isVoiceOverEnabled }
+    private var otherManagersRunning: [String] {
+        Preferences.runningWindowManagers(among: NSWorkspace.shared.runningApplications.map(\.bundleIdentifier))
+    }
+    private func isInstalled(_ bundleID: String) -> Bool { NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil }
     #endif
 
     /// Builds the window without showing it (also used by offscreen renders).
     func prepareWindow() {
         guard window == nil else { return }
-        let size = NSSize(width: OnboardingMetrics.width, height: OnboardingMetrics.height(voiceOver: voiceOverRow))
+        let size = NSSize(width: OnboardingMetrics.width, height: OnboardingMetrics.height)
         let window = OnboardingWindow(contentRect: NSRect(origin: .zero, size: size),
                                       styleMask: [.titled, .closable, .fullSizeContentView],
                                       backing: .buffered, defer: true)
@@ -123,6 +158,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         content.frame = NSRect(origin: .zero, size: size)
         window.contentView = content
         trusted = app.isTrusted
+        runningManagers = otherManagersRunning
         buildContent()
         applyPalette()
         go(to: 0, animated: false)
@@ -158,6 +194,16 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         for name in [NSWorkspace.screensDidSleepNotification, NSWorkspace.screensDidWakeNotification] {
             workspaceObservers.append(followsVisibility(NSWorkspace.shared.notificationCenter, name, nil))
         }
+        // Tiles, Spectacle… start or quit: the practice line says whether they compete for keys.
+        for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification] {
+            workspaceObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                guard let self else { return }
+                let now = self.otherManagersRunning
+                guard now != self.runningManagers else { return }
+                self.runningManagers = now
+                self.refreshPracticeLine()
+            })
+        }
         voiceOverObservation = NSWorkspace.shared.observe(\.isVoiceOverEnabled) { [weak self] _, _ in
             DispatchQueue.main.async { self?.voiceOverChanged() }
         }
@@ -166,21 +212,26 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     /// Set by "Allow Accessibility…" in the menu: the next `show()` starts on the permission
     /// screen even if setup was never finished. Consumed by `show()`.
     static var opensAtPermission = false
+    /// Set by Settings › Shortcuts › Practice: the next `show()` goes to the practice screen
+    /// (when access is there). Consumed by `show()`.
+    static var opensAtPractice = false
 
     func show() {
         let fresh = window == nil
         prepareWindow()
         guard let window else { return }
-        let wantsPermission = Self.opensAtPermission
+        let wantsPermission = Self.opensAtPermission, wantsPractice = Self.opensAtPractice
         Self.opensAtPermission = false
+        Self.opensAtPractice = false
         if window.isMiniaturized {
             // Back from the Dock where it was, on its page.
             window.deminiaturize(nil)
         } else if fresh || !window.isVisible {
-            go(to: startPage(wantsPermission: wantsPermission), animated: false)
+            go(to: wantsPractice && app.isTrusted ? 2 : startPage(wantsPermission: wantsPermission), animated: false)
             window.center()
         }
         if wantsPermission, !app.isTrusted, currentIndex != 1 { go(to: 1, animated: true) }
+        if wantsPractice, app.isTrusted, currentIndex != 2 { go(to: 2, animated: true) }
         gate.isActive = true
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
@@ -189,10 +240,13 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// The page a closed window opens on: Welcome the first time; straight to the permission screen
-    /// when access is missing and the user has been here before (or came from "Allow Accessibility…").
+    /// when access is missing and the user has been here before (or came from "Allow Accessibility…");
+    /// straight to the practice when access is there and the user has not practised yet.
     func startPage(wantsPermission: Bool) -> Int {
         let returning = app.prefs.onboardingDone || app.prefs.onboardingSeen || wantsPermission
-        return returning && !app.isTrusted ? 1 : 0
+        guard returning else { return 0 }
+        if !app.isTrusted { return 1 }
+        return app.prefs.practiceSeen ? 0 : 2
     }
 
     private func buildContent() {
@@ -239,13 +293,12 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private var pageFrame: CGRect {
         CGRect(x: OnboardingMetrics.columnX, y: OnboardingMetrics.pageTop,
-               width: OnboardingMetrics.columnWidth, height: OnboardingMetrics.pageHeight(voiceOver: voiceOverRow))
+               width: OnboardingMetrics.columnWidth, height: OnboardingMetrics.pageHeight)
     }
 
     /// Bottom bar: progress at the left, buttons right-aligned (Back · Later · primary).
     private func layoutChrome() {
-        let height = OnboardingMetrics.height(voiceOver: voiceOverRow)
-        let mid = height - OnboardingMetrics.barHeight / 2
+        let mid = OnboardingMetrics.height - OnboardingMetrics.barHeight / 2
         let size = progress.intrinsicContentSize
         progress.frame = CGRect(x: OnboardingMetrics.columnX, y: mid - 6, width: size.width, height: 12)
         var x = OnboardingMetrics.columnX + OnboardingMetrics.columnWidth
@@ -259,17 +312,9 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         if !transitioning { for p in pages { p.frame = pageFrame } }
     }
 
-    /// VoiceOver's row (screen 3's shortcut set) makes the window one row taller; its top stays.
+    /// VoiceOver pauses ⌃⌥ shortcuts: the practice line says so.
     private func voiceOverChanged() {
-        guard let window else { return }
-        let height = OnboardingMetrics.height(voiceOver: voiceOverRow)
-        var frame = window.frame
-        if frame.height != height {
-            frame.origin.y -= height - frame.height
-            frame.size.height = height
-            window.setFrame(frame, display: window.isVisible)
-        }
-        layoutChrome()
+        guard window != nil else { return }
         updateCurrentPage()
     }
 
@@ -281,6 +326,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         if from == 0, from != index, playing { dragPlayed = true } // seen, and the user moved on
         stopMotion() // the page changes: the old scene stops at rest (§5.2 rule 6)
         grantPending = false
+        if from == 2, index != 2 { stopPractice() }
         currentIndex = index
         if index == 2 { tryShown = true }
         stage.scene = scenes[index]
@@ -421,7 +467,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private func updateCurrentPage() {
         guard !pages.isEmpty else { return }
         showAccessState(force: false)
-        tryPage.update(prefs: app.prefs, canTry: trusted, voiceOver: voiceOverRow)
+        tryPage.update(prefs: app.prefs)
+        refreshPracticeLine()
         let shortcuts = KeysScene.actions.map { app.prefs.shortcut(for: $0) ?? $0.defaultShortcut }
         keys.configure(modifiers: shortcuts.first??.modifiers ?? [.control, .option],
                        actionKeys: shortcuts.map { s in s.map { KeyNames.name(for: $0.keyCode) } ?? "" })
@@ -432,13 +479,17 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         updateCurrentPage()
         // New shortcuts mean new keys in Scene C: start its demo over with them.
         guard (keys.modifiers, keys.actionKeys) != before, currentIndex == 2, !transitioning else { return }
-        if gate.isOpen, !mirroring { playKeys() } else { showStatic() }
+        if gate.isOpen, !practicePaused { playGuide() } else { showStatic() }
     }
 
     /// The page is on screen: start what belongs to it, move VoiceOver to its title.
     private func pageDidAppear() {
         if currentIndex == 1 { startWatchingPermission() } else { stopWatchingPermission() }
-        if currentIndex == 2 { applyVoiceOverDefaultIfNeeded() }
+        if currentIndex == 2 {
+            applyVoiceOverDefaultIfNeeded()
+            applyFamiliarSetIfNeeded()
+            startPractice()
+        }
         if currentIndex != 1 { checkTrust() }
         if let title = pages[currentIndex].titleField { OnboardingSpeech.focus(title) }
         window?.makeFirstResponder(primaryButton)
@@ -449,7 +500,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     /// user still has the untouched Classic defaults: a Classic set the user chose, or any recorded
     /// shortcut, is a decision this never overrides).
     private func applyVoiceOverDefaultIfNeeded() {
-        guard !appliedVoiceOverSet, Self.wantsVoiceOverSet(voiceOver: NSWorkspace.shared.isVoiceOverEnabled, prefs: app.prefs) else { return }
+        guard !appliedVoiceOverSet, Self.wantsVoiceOverSet(voiceOver: voiceOverOn, prefs: app.prefs) else { return }
         appliedVoiceOverSet = true
         app.prefs.applyShortcutSet(.alternate)
         OnboardingSpeech.announce("Alternate shortcuts selected, because VoiceOver is on.")
@@ -457,6 +508,24 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     static func wantsVoiceOverSet(voiceOver: Bool, prefs: Preferences) -> Bool {
         voiceOver && !prefs.shortcutsCustomized && prefs.currentShortcutSet == .classic
+    }
+
+    /// Screen 3 starts on the set of a window manager the user already knows (Tiles or Spectacle
+    /// installed: Option-Command), on the same terms as VoiceOver's: untouched Classic defaults
+    /// only, and never over VoiceOver's Alternate. The line says so; the set control is right there.
+    private func applyFamiliarSetIfNeeded() {
+        guard !appliedFamiliarSet else { return }
+        appliedFamiliarSet = true
+        guard let familiar = Self.familiarSet(voiceOver: voiceOverOn, prefs: app.prefs, installed: isInstalled) else { return }
+        app.prefs.applyShortcutSet(familiar.set)
+        lastResult = .familiar(familiar.name, familiar.set, tryPage.target)
+        refreshPracticeLine()
+        OnboardingSpeech.announce(tryPage.spokenLine)
+    }
+
+    static func familiarSet(voiceOver: Bool, prefs: Preferences, installed: (String) -> Bool) -> (name: String, set: Preferences.ShortcutSet)? {
+        guard !voiceOver, !prefs.shortcutsCustomized, prefs.currentShortcutSet == .classic else { return nil }
+        return Preferences.familiarApp(installed: installed)
     }
 
     // MARK: motion
@@ -505,7 +574,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             } else if !trusted {
                 playAccess()
             }
-        default: if !mirroring { playKeys() }
+        default: if !practicePaused { playGuide() }
         }
     }
 
@@ -513,6 +582,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private func stopMotion() {
         motionToken += 1
         playing = false
+        guidePlaying = false
         if grantPlaying {
             grantPlaying = false
             StagePlayer.stop(grantLayers)
@@ -541,11 +611,10 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         case 1:
             permission.show(trusted && !grantPending ? AccessScene.granted.restPose : AccessScene.waiting.restPose)
         default:
-            if mirroring, let mirrorPose {
-                keys.show(mirrorPose)
+            if !practicePaused, let target = tryPage.target, let guide = keys.guideTimeline(target) {
+                keys.show(rm ? guide.pose(at: guide.explainT) : guide.restPose)
             } else {
-                let loop = keys.loopTimeline
-                keys.show(rm ? loop.pose(at: loop.explainT) : loop.restPose)
+                keys.show(keys.restingPose(tryPage.target ?? lastMirrored).merging(keys.heldPose(heldChord)))
             }
         }
     }
@@ -569,9 +638,10 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             if trusted { return AccessScene.granted.restPose }
             return willPlay ? AccessScene.waiting.pose(at: 0) : AccessScene.waiting.restPose
         default:
-            if mirroring, let mirrorPose { return mirrorPose }
-            let loop = keys.loopTimeline
-            return willPlay ? loop.pose(at: 0) : loop.pose(at: gate.reduceMotion ? loop.explainT : loop.restT)
+            guard !practicePaused, let target = tryPage.target, let guide = keys.guideTimeline(target) else {
+                return keys.restingPose(tryPage.target ?? lastMirrored)
+            }
+            return willPlay ? guide.pose(at: 0) : guide.pose(at: gate.reduceMotion ? guide.explainT : guide.restT)
         }
     }
 
@@ -581,6 +651,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         let token = motionToken
         StagePlayer.stop(layers)
         playing = true
+        guidePlaying = false
         StagePlayer.play(timelines, on: layers, loops: loops) { [weak self] in
             guard let self, self.motionToken == token else { return }
             self.playing = false
@@ -602,11 +673,15 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    private func playKeys() {
+    /// Scene C guides the next step (nothing left to try: the window rests where the user put it).
+    private func playGuide() {
+        guard let target = tryPage.target, let guide = keys.guideTimeline(target) else {
+            stopMotion()
+            return
+        }
         for l in keys.allLayers { l.removeAllAnimations() }
-        let loop = keys.loopTimeline
-        keys.settled(after: loop)
-        play([loop], on: keys.layers, loops: Theme.Motion.maxLoops)
+        play([guide], on: keys.layers, loops: Theme.Motion.maxLoops)
+        guidePlaying = true
     }
 
     /// Storyboard E (Reduce Motion: its cross-fade variant). Scene B jumps to the switch-on pose.
@@ -634,12 +709,13 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             playDrag(replay: shown)
         case 1: if !grantPlaying { playAccess() }
         default:
-            if mirroring, let m = lastMirror, let t = keys.mirrorTimeline(m.action, cycle: m.cycle, press: m.press) {
-                for l in keys.allLayers { l.removeAllAnimations() }
-                play([t], on: keys.layers)
-            } else if !mirroring {
-                playKeys()
-            }
+            // The guide again, now, for the step that is next.
+            idleResume?.cancel()
+            idleResume = nil
+            practicePaused = false
+            lastResult = nil
+            refreshPracticeLine()
+            playGuide()
         }
     }
 
@@ -759,37 +835,185 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    // MARK: snaps (screen 3)
+    // MARK: practice (screen 3)
 
-    /// Called for every snapped event (via the .noktaDidSnap broadcast); its chip gets a ✓ from any
-    /// screen. Once screen 3 has been current, the first one ends the demo for good (mirror mode)
-    /// and each of the four actions then plays its segment once; before that the demo still plays.
+    /// Seconds without a key before the guide plays again and the line goes back to the step.
+    static let practiceIdle: TimeInterval = 6
+
+    private var practiceContext: PracticeCoach.Context {
+        let prefs = app.prefs, app = self.app
+        return PracticeCoach.Context(shortcut: { prefs.shortcut(for: $0) }, target: tryPage.target,
+                                     voiceOverPaused: app.voiceOverSuspended, result: { app.hotkeyResults[$0] },
+                                     runningManagers: runningManagers)
+    }
+
+    /// The modifiers held that make a chord (⇧ alone is typing, not a shortcut).
+    private var heldChord: NoktaMods { held.intersection([.control, .option, .command]).isEmpty ? [] : held }
+
+    /// The practice line: the held keys while no press has answered them, else the last press's
+    /// outcome, else the step (or what stands in its way).
+    func refreshPracticeLine() {
+        guard tryPage != nil else { return }
+        if trusted, !heldChord.isEmpty, !resultSinceHold {
+            tryPage.show(.holding(heldChord, tryPage.target))
+        } else if trusted, let lastResult {
+            tryPage.show(lastResult)
+        } else { // access gone: locked, whatever was said before
+            tryPage.show(PracticeCoach.idle(trusted: trusted, target: tryPage.target, practiceContext))
+        }
+    }
+
+    private func startPractice() {
+        guard practiceMonitor == nil else { return }
+        practiceMonitor = NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { [weak self] event in
+            if let self, event.window === self.window { self.practiceKey(event) }
+            return event // only read: every key keeps working
+        }
+    }
+
+    private func stopPractice() {
+        if let practiceMonitor { NSEvent.removeMonitor(practiceMonitor) }
+        practiceMonitor = nil
+        idleResume?.cancel()
+        idleResume = nil
+        held = []
+        practicePaused = false
+        lastResult = nil
+        refreshPracticeLine()
+    }
+
+    private func practiceKey(_ event: NSEvent) {
+        switch event.type {
+        case .flagsChanged: practiceFlags(NoktaMods(event.modifierFlags))
+        case .keyDown where !event.isARepeat:
+            practicePress(Shortcut(keyCode: UInt32(event.keyCode), mods: NoktaMods(event.modifierFlags).rawValue))
+        default: break
+        }
+    }
+
+    private var practising: Bool { currentIndex == 2 && !transitioning && trusted }
+
+    /// Modifiers went down or up.
+    private func practiceFlags(_ mods: NoktaMods) {
+        guard practising, mods != held else { return }
+        let chordBefore = heldChord
+        held = mods
+        if chordBefore.isEmpty, !heldChord.isEmpty { resultSinceHold = false }
+        interacted()
+    }
+
+    /// A key press reached this window (so it was no Snapline shortcut that Snapline got).
+    private func practicePress(_ pressed: Shortcut) {
+        guard practising, let verdict = PracticeCoach.evaluate(pressed, practiceContext) else { return }
+        note(verdict)
+    }
+
+    /// A press's outcome: on the line until the next one, or the idle timeout; VoiceOver hears it.
+    private func note(_ status: PracticeStatus) {
+        lastResult = status
+        resultSinceHold = true
+        interacted()
+        OnboardingSpeech.announce(tryPage.spokenLine)
+    }
+
+    /// The user pressed something: the guide stops where the window is, the keycaps show the held
+    /// modifiers, and the idle clock starts over.
+    private func interacted() {
+        practicePaused = true
+        if guidePlaying {
+            stopMotion() // also shows the static pose: the window where it is, the held keys
+        } else {
+            showHeldKeys()
+        }
+        refreshPracticeLine()
+        idleResume?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.practiceIdleElapsed() }
+        idleResume = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.practiceIdle, execute: work)
+    }
+
+    /// The held modifiers on the keycaps. Model values only: a mirror segment that plays keeps
+    /// playing and ends on them.
+    private func showHeldKeys() {
+        guard currentIndex == 2 else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        PoseApplier.set(keys.heldPose(heldChord), on: keys.layers)
+        CATransaction.commit()
+    }
+
+    private func practiceIdleElapsed() {
+        idleResume = nil
+        guard currentIndex == 2, practicePaused else { return }
+        if !heldChord.isEmpty { // still holding keys: wait for them
+            interacted()
+            return
+        }
+        practicePaused = false
+        lastResult = nil
+        refreshPracticeLine()
+        if gate.isOpen, !transitioning { playGuide() } else if !playing { showStatic() }
+    }
+
+    /// Hotkey registrations changed (another app took or freed one): the line may say so.
+    func practiceStateChanged() { refreshPracticeLine() }
+
+    /// Called for every snapped and failed event (via the .noktaDidSnap broadcast). A snap ticks
+    /// its chip from any screen. On screen 3 it is a practice step: the line says it worked and
+    /// names the next one, and Scene C plays the user's own snap (the keys press only if it came
+    /// from the keyboard). A failed shortcut there says why nothing moved; Restore with nothing to
+    /// put back still counts — the shortcut reached Snapline.
     func noteSnap(_ event: NoktaEvent) {
         guard let action = event.action, tryPage != nil else { return }
         let onTry = currentIndex == 2 && !transitioning
-        if tryShown, !mirroring {
-            mirroring = true
-            keys.mirroring = true
-            if onTry { stopMotion() }
+        let practised = TryPage.tryActions.contains { $0.0 == action }
+        if event.kind == .failed {
+            guard onTry, practised, event.source == .keyboard else { return }
+            if action == .restore, event.result == .invalid {
+                _ = tryPage.markTried(.restore)
+                tryPage.update(prefs: app.prefs)
+                note(.nothingToRestore)
+            } else {
+                note(.failed(action, event.result))
+            }
+            return
         }
-        let newlyTried = tryPage.markTried(action)
-        tryPage.update(prefs: app.prefs, canTry: trusted, voiceOver: voiceOverRow)
-        if newlyTried, currentIndex == 2 { OnboardingSpeech.announce("\(action.title) tried.") }
-        guard mirroring else { return }
+        guard event.kind == .snapped else { return }
+        _ = tryPage.markTried(action)
+        tryPage.update(prefs: app.prefs)
+        guard tryShown, practised else { return }
         let press = event.source == .keyboard
-        guard let timeline = keys.mirrorTimeline(action, cycle: event.cycle, press: press) else { return }
-        lastMirror = (action, event.cycle, press)
-        mirrorPose = timeline.restPose
-        keys.settled(after: timeline)
+        let mirror = keys.mirrorTimeline(action, cycle: event.cycle, press: press)
+        if onTry { note(.worked(action, keyboard: press, next: tryPage.target)) }
+        guard let mirror else { return }
+        keys.settled(after: mirror)
+        keys.mirroring = true
+        lastMirrored = action
         NSAccessibility.post(element: stage, notification: .valueChanged)
         guard onTry else { return }
         if gate.isOpen {
             for l in keys.allLayers { l.removeAllAnimations() }
-            play([timeline], on: keys.layers)
+            play([mirror], on: keys.layers) { [weak self] in self?.showHeldKeys() }
         } else {
-            keys.show(timeline.restPose) // Reduce Motion or not visible: the pose changes at once
+            keys.show(mirror.restPose.merging(keys.heldPose(heldChord))) // Reduce Motion or not visible: at once
         }
     }
+
+    #if NOKTA_SNAPSHOT
+    /// Offscreen tests: the practice as the key monitor would drive it.
+    func testPracticeFlags(_ mods: NoktaMods) { practiceFlags(mods) }
+    func testPracticePress(_ s: Shortcut) { practicePress(s) }
+    func testPracticeIdle() { idleResume?.cancel(); practiceIdleElapsed() }
+    var practiceStatus: PracticeStatus { tryPage.status }
+    var practiceLine: String { tryPage.spokenLine }
+    var practiceIsPaused: Bool { practicePaused }
+    var practiceMonitorInstalled: Bool { practiceMonitor != nil }
+    var practiceTarget: NoktaAction? { tryPage.target }
+    var heldModifiers: NoktaMods { held }
+    var tryScreen: TryPage { tryPage }
+    /// What `show()` would start with once on screen 3.
+    func testAppear() { pageDidAppear() }
+    #endif
 
     // MARK: actions
 
@@ -824,9 +1048,11 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     @objc private func changeSet(_ sender: NSSegmentedControl) {
-        let sets: [Preferences.ShortcutSet] = [.classic, .alternate]
+        let sets = Preferences.ShortcutSet.allCases
         guard sets.indices.contains(sender.selectedSegment) else { return }
         app.prefs.applyShortcutSet(sets[sender.selectedSegment])
+        lastResult = nil // the old set's hint no longer applies
+        refreshPracticeLine()
     }
 
     /// Set when the user flips the login switch (applied on Done).
@@ -848,8 +1074,10 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         stopWatchingPermission()
+        stopPractice()
         gate.isActive = false
         app.prefs.onboardingSeen = true // the next launch does not open it again unless access is missing
+        if tryShown { app.prefs.practiceSeen = true }
         DispatchQueue.main.async { [self] in
             // Same as Settings: drop the content so the scenes' views and layers are freed even if
             // AppKit keeps the closed window object a while (DESIGN §17.9).
@@ -903,7 +1131,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
             activeStoryboard = (AccessScene.waiting, permission.layers, [:], {})
         case .keys:
             go(to: 2, animated: false)
-            activeStoryboard = (keys.loopTimeline, keys.layers, [:], {})
+            activeStoryboard = (keys.guideTimeline(tryPage.target ?? .leftHalf)!, keys.layers, [:], {})
         case .grant:
             go(to: 1, animated: false)
             access.showWaiting()

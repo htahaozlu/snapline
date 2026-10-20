@@ -194,6 +194,8 @@ enum RecoveryTests {
         c.expect(AppController.showsOnboardingAtLaunch(trusted: true, prefs: prefs), "R6 first launch shows onboarding")
         c.expect(AppController.showsOnboardingAtLaunch(trusted: false, prefs: prefs), "R6 first launch without access shows onboarding")
         prefs.onboardingSeen = true // closed with Later / Esc / ⌘W
+        c.expect(AppController.showsOnboardingAtLaunch(trusted: true, prefs: prefs), "R6 closed before practising: once more, on the practice")
+        prefs.practiceSeen = true
         c.expect(!AppController.showsOnboardingAtLaunch(trusted: true, prefs: prefs), "R6 a returning user with access is not shown onboarding again")
         c.expect(AppController.showsOnboardingAtLaunch(trusted: false, prefs: prefs), "R6 a returning user without access gets the permission screen")
         prefs.onboardingDone = true
@@ -219,6 +221,8 @@ enum RecoveryTests {
         // Resetting all settings keeps onboarding progress.
         app.prefs.onboardingDone = true
         app.prefs.resetAllSettings(domain: "rt")
-        c.expect(app.prefs.onboardingDone && app.prefs.onboardingSeen, "R6 Reset All keeps onboarding done and seen")
+        app.prefs.practiceSeen = true
+        app.prefs.resetAllSettings(domain: "rt")
+        c.expect(app.prefs.onboardingDone && app.prefs.onboardingSeen && app.prefs.practiceSeen, "R6 Reset All keeps onboarding done, seen and practised")
     }
 }

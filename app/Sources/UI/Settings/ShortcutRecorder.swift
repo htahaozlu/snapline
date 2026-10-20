@@ -3,13 +3,17 @@ import AppKit
 /// Spoken and chip forms of a shortcut ("Control Option Left Arrow", ["⌃", "⌥", "←"]).
 enum ShortcutSpeech {
     static func spoken(_ s: Shortcut) -> String {
+        let m = modifiers(s.modifiers)
+        return m.isEmpty ? keyName(s.keyCode) : m + " " + keyName(s.keyCode)
+    }
+
+    /// "Control Option" for ⌃⌥.
+    static func modifiers(_ m: NoktaMods) -> String {
         var parts: [String] = []
-        let m = s.modifiers
         if m.contains(.control) { parts.append("Control") }
         if m.contains(.option) { parts.append("Option") }
         if m.contains(.shift) { parts.append("Shift") }
         if m.contains(.command) { parts.append("Command") }
-        parts.append(keyName(s.keyCode))
         return parts.joined(separator: " ")
     }
 

@@ -41,6 +41,11 @@
 #   `size -m build/Snapline.app/Contents/MacOS/Snapline` and the bench startup numbers.
 #   -Xlinker -dead_strip_dylibs was tried: it only drops frameworks the binary never references,
 #   the swift overlay dylibs (libswiftMetal, ...) stay, so it is not enabled.
+#   -Xfrontend -disable-reflection-metadata (0.4.0): drops the field/case-name tables only Mirror,
+#   dump() and printing a non-string value read — nothing in app/Sources does (every interpolation
+#   is a String, a number or a rawValue/title/id; Codable and key paths do not use the tables).
+#   875,520 → 842,096 B arm64 when the practice screen was added: __TEXT back from 41 to 39 16 KB
+#   pages. The snapshot tool keeps the tables (its file names and messages print enum cases).
 #
 # Signing: the self-signed "Nokta Local Dev Signing" identity (see scripts/setup-signing.sh)
 # gives a STABLE designated requirement (identifier + certificate root = H"cad4..."), so the
@@ -81,7 +86,7 @@ human() { awk -v b="$1" 'BEGIN{ if (b>=1048576) printf "%.2f MB", b/1048576; els
 
 case "$OPT" in
     debug) SWIFT_OPT_DEFAULT="-Onone -g" ;;
-    small) SWIFT_OPT_DEFAULT="-Osize -wmo" ;;
+    small) SWIFT_OPT_DEFAULT="-Osize -wmo -Xfrontend -disable-reflection-metadata" ;;
     *) die "NOKTA_OPTIMIZE must be debug|small (got '$OPT'; build.zig pins ReleaseSmall)" ;;
 esac
 SWIFT_OPT="${NOKTA_SWIFT_OPT:-$SWIFT_OPT_DEFAULT}"

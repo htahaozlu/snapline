@@ -3,12 +3,11 @@ import QuartzCore
 
 /// Onboarding layout (docs/DESIGN.md §11; design-v2-opus.md §3.6), in points from the window's top
 /// left: the stage at (40, 40, 480, 200); the text column 480 wide at x 40, its title at y 264;
-/// the bottom bar 64 high. VoiceOver adds one row on screen 3 (the shortcut set), so the window is
-/// one row taller while VoiceOver runs.
+/// the bottom bar 64 high; 472 high, so screen 3 has room for its practice line, the shortcut set
+/// and `Open at login`.
 enum OnboardingMetrics {
     static let width: CGFloat = 560
-    static let baseHeight: CGFloat = 440
-    static let voiceOverRow: CGFloat = 32
+    static let height: CGFloat = 472
     static let stage = CGRect(origin: CGPoint(x: 40, y: 40), size: StageScene.size)
     static let columnX: CGFloat = 40
     static let columnWidth: CGFloat = 480
@@ -16,8 +15,7 @@ enum OnboardingMetrics {
     static let pageTop: CGFloat = 256
     static let barHeight: CGFloat = 64
 
-    static func height(voiceOver: Bool) -> CGFloat { baseHeight + (voiceOver ? voiceOverRow : 0) }
-    static func pageHeight(voiceOver: Bool) -> CGFloat { height(voiceOver: voiceOver) - barHeight - pageTop }
+    static let pageHeight: CGFloat = height - barHeight - pageTop
 }
 
 /// The window's content: paper ground (a layer colour, no drawing), flipped like the layout.
@@ -341,30 +339,42 @@ final class AccessPage: OnboardingPage {
     }
 }
 
-/// Screen 3 — Try: four shortcut chips (✓ once tried), the line about this window and the menu bar
-/// with the real menu bar icon inline, `Open at login`, and — only with VoiceOver on — the
-/// shortcut set selector.
+/// Screen 3 — Try, a practice: four shortcut chips (the next one to try outlined, ✓ once tried),
+/// the practice line — the step to try, the keys the user holds, what a press did or why it did
+/// nothing; at the end the menu bar sentence with the real menu bar icon inline — the shortcut set
+/// and `Open at login`.
 final class TryPage: OnboardingPage {
     static let tryActions: [(NoktaAction, String)] = [(.leftHalf, "Left"), (.rightHalf, "Right"), (.maximize, "Maximize"), (.restore, "Restore")]
     static let chipGap: CGFloat = 12
+    private static let keysRole = Typography.Role.keycap(size: 13)
 
     private let title = OnboardingText.label("Try a shortcut", role: .title, color: Theme.Color.ink)
     private(set) var chips: [ShortcutChip] = []
-    private let body = OnboardingText.label("", role: .body, color: .secondaryLabelColor)
+    /// The practice line.
+    let line = NSTextField(labelWithString: "")
     private let icon = NSImageView()
+    private let setLabel = OnboardingText.label("Shortcuts", role: .body, color: .labelColor)
+    let setControl: NSSegmentedControl
     private let loginLabel = OnboardingText.label("Open at login", role: .body, color: .labelColor)
     let loginSwitch = NSSwitch()
-    private let setLabel = OnboardingText.label("Alternate shortcuts, for VoiceOver.", role: .body, color: .labelColor)
-    let setControl: NSSegmentedControl
     private(set) var tried: Set<NoktaAction> = []
+    private(set) var status = PracticeStatus.locked
+    private var shortcut: (NoktaAction) -> Shortcut? = { $0.defaultShortcut }
 
     override var titleField: NSTextField? { title }
 
+    /// The first chip not tried yet (nil: all four done).
+    var target: NoktaAction? { Self.tryActions.first { !tried.contains($0.0) }?.0 }
+
     init(frame frameRect: NSRect, target: AnyObject, login: Selector, setAction: Selector) {
-        setControl = NSSegmentedControl(labels: ["Classic ⌃⌥", "Alternate ⌃⇧⌘"], trackingMode: .selectOne, target: target, action: setAction)
+        setControl = NSSegmentedControl(labels: Preferences.ShortcutSet.allCases.map(\.label), trackingMode: .selectOne,
+                                        target: target, action: setAction)
         super.init(frame: frameRect)
         OnboardingText.place(title, at: CGPoint(x: 0, y: 8), role: .title)
         chips = Self.tryActions.map { ShortcutChip(action: $0.0, name: $0.1) }
+        line.isSelectable = false
+        line.lineBreakMode = .byTruncatingTail
+        line.setAccessibilityRole(.staticText)
         icon.image = Glyphs.statusIcon(.active)
         icon.imageScaling = .scaleNone
         icon.contentTintColor = Theme.Color.ink
@@ -375,8 +385,9 @@ final class TryPage: OnboardingPage {
         loginLabel.setAccessibilityElement(false)
         setControl.segmentStyle = .rounded
         setControl.setAccessibilityLabel("Shortcut set")
+        for (i, set) in Preferences.ShortcutSet.allCases.enumerated() { setControl.setToolTip(set.help, forSegment: i) }
         setLabel.setAccessibilityElement(false)
-        for v in [title, body, icon, loginLabel, loginSwitch, setLabel, setControl] as [NSView] + chips { addSubview(v) }
+        for v in [title, line, icon, setLabel, setControl, loginLabel, loginSwitch] as [NSView] + chips { addSubview(v) }
         layoutRows()
     }
     required init?(coder: NSCoder) { nil }
@@ -396,33 +407,63 @@ final class TryPage: OnboardingPage {
             chip.frame = CGRect(x: x, y: 44, width: chip.intrinsicContentSize.width, height: ShortcutChip.height)
             x += chip.frame.width + gap
         }
-        OnboardingText.place(body, at: CGPoint(x: 0, y: 74), role: .body, maxWidth: OnboardingMetrics.columnWidth - 22)
-        // A word space after the text; the icon's frame sits on the baseline, so its outside dot
-        // reads as the sentence's period.
-        let end = OnboardingText.textEnd(body, role: .body)
-        icon.frame = CGRect(x: (end.x + 4).rounded(), y: (end.baseline - 14).rounded(), width: 18, height: 18)
+        // The line, as wide as its text; the menu bar icon after it reads as the sentence's period.
+        let text = line.attributedStringValue
+        let width = min(column - 22, ceil(text.size().width) + 2 * OnboardingText.textInset)
+        line.frame = CGRect(x: 0, y: 76, width: width, height: 18)
+        icon.isHidden = !status.endsWithMenuBar
+        let inset = line.cell?.titleRect(forBounds: line.bounds).minX ?? 0
+        let end = line.frame.minX + inset + OnboardingText.textInset + ceil(text.size().width)
+        let baseline = line.frame.minY + line.firstBaselineOffsetFromTop
+        icon.frame = CGRect(x: (min(end, column - 18) + 4).rounded(), y: (baseline - 14).rounded(), width: 18, height: 18)
+
+        OnboardingText.place(setLabel, at: CGPoint(x: 0, y: 105), role: .body)
+        var segment = setControl.fittingSize
+        if setLabel.frame.maxX + 12 + segment.width > column {
+            // Too long for the column: the keys alone (the names stay in the tooltips).
+            for (i, set) in Preferences.ShortcutSet.allCases.enumerated() { setControl.setLabel(set.symbols, forSegment: i) }
+            segment = setControl.fittingSize
+        }
+        setControl.frame = CGRect(x: setLabel.frame.maxX + 12, y: 102 + ((22 - segment.height) / 2).rounded(), width: segment.width, height: segment.height)
         let switchSize = loginSwitch.fittingSize
-        OnboardingText.place(loginLabel, at: CGPoint(x: 0, y: 99), role: .body)
-        loginSwitch.frame = CGRect(x: loginLabel.frame.maxX + 12, y: 96 + ((22 - switchSize.height) / 2).rounded(),
+        OnboardingText.place(loginLabel, at: CGPoint(x: 0, y: 133), role: .body)
+        loginSwitch.frame = CGRect(x: loginLabel.frame.maxX + 12, y: 130 + ((22 - switchSize.height) / 2).rounded(),
                                    width: switchSize.width, height: switchSize.height)
-        OnboardingText.place(setLabel, at: CGPoint(x: 0, y: 131), role: .body)
-        let segment = setControl.fittingSize
-        setControl.frame = CGRect(x: setLabel.frame.maxX + 12, y: 128 + ((22 - segment.height) / 2).rounded(), width: segment.width, height: segment.height)
     }
 
-    /// Current shortcuts, permission and VoiceOver state.
-    func update(prefs: Preferences, canTry: Bool, voiceOver: Bool) {
+    /// Current shortcuts and set; the line is drawn again with them.
+    func update(prefs: Preferences) {
+        shortcut = { prefs.shortcut(for: $0) }
+        let next = target
         for chip in chips {
             chip.shortcut = prefs.shortcut(for: chip.action)
             chip.tried = tried.contains(chip.action)
+            chip.isTarget = chip.action == next && !status.isLocked
         }
-        let first = canTry ? "This window moves." : "Shortcuts start after you allow access."
-        OnboardingText.set(body, "\(first) \(Product.name) stays in the menu bar", role: .body, color: .secondaryLabelColor)
-        body.setAccessibilityLabel("\(first) \(Product.name) stays in the menu bar.")
-        setLabel.isHidden = !voiceOver
-        setControl.isHidden = !voiceOver
-        let sets: [Preferences.ShortcutSet] = [.classic, .alternate]
-        setControl.selectedSegment = prefs.currentShortcutSet.flatMap { sets.firstIndex(of: $0) } ?? -1
+        setControl.selectedSegment = prefs.currentShortcutSet.flatMap { Preferences.ShortcutSet.allCases.firstIndex(of: $0) } ?? -1
+        render()
+    }
+
+    /// Shows `status` on the practice line.
+    func show(_ status: PracticeStatus) {
+        self.status = status
+        let next = target
+        for chip in chips { chip.isTarget = chip.action == next && !status.isLocked }
+        render()
+    }
+
+    /// The line's text for VoiceOver (also what an announcement says).
+    var spokenLine: String { status.runs(shortcut).map { $0.spoken ?? $0.text }.joined() + (status.endsWithMenuBar ? "." : "") }
+
+    private func render() {
+        let text = NSMutableAttributedString()
+        let keys: [NSAttributedString.Key: Any] = [.font: Typography.font(Self.keysRole), .foregroundColor: Theme.Color.ink]
+        for run in status.runs(shortcut) {
+            text.append(run.keys ? NSAttributedString(string: run.text, attributes: keys)
+                                 : OnboardingText.attributed(run.text, role: .body, color: .secondaryLabelColor))
+        }
+        line.attributedStringValue = text
+        line.setAccessibilityLabel(spokenLine)
         layoutRows()
     }
 
@@ -462,6 +503,14 @@ final class ShortcutChip: NSView {
         }
     }
     var reservesCheck = true { didSet { if reservesCheck != oldValue { invalidateIntrinsicContentSize() } } }
+    /// The next one to try: outlined.
+    var isTarget = false {
+        didSet {
+            guard isTarget != oldValue else { return }
+            needsDisplay = true
+            NSAccessibility.post(element: self, notification: .valueChanged)
+        }
+    }
 
     init(action: NoktaAction, name: String) {
         self.action = action
@@ -493,7 +542,12 @@ final class ShortcutChip: NSView {
         let shape = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: Theme.Radius.small, yRadius: Theme.Radius.small)
         (tried ? wash.withAlphaComponent(wash.alphaComponent * 2) : wash).setFill() // tried: pressed-key wash
         shape.fill()
-        if v.isHighContrast {
+        if isTarget {
+            let ring = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.75, dy: 0.75), xRadius: Theme.Radius.small, yRadius: Theme.Radius.small)
+            ring.lineWidth = 1.5
+            Theme.Color.ink.setStroke()
+            ring.stroke()
+        } else if v.isHighContrast {
             Theme.Color.ink.setStroke()
             shape.stroke()
         }
@@ -516,5 +570,5 @@ final class ShortcutChip: NSView {
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
     override func accessibilityLabel() -> String? { "\(ShortcutSpeech.spoken(shortcut)), \(action.title)" }
-    override func accessibilityValue() -> Any? { tried ? "tried" : nil }
+    override func accessibilityValue() -> Any? { tried ? "tried" : (isTarget ? "next" : nil) }
 }

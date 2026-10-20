@@ -15,7 +15,9 @@
 #   SNAPLINE_ALLOW_DIRTY=1    build from a tree with uncommitted changes (never for a published release)
 #
 # Network: Apple's timestamp server (codesign --timestamp) and notary service (the app and the DMG
-# are uploaded for notarization). Nothing else. Fails closed: any step that does not verify stops it.
+# are uploaded for notarization), and PyPI on the first run only: tools/dmg/make-dmg.sh installs
+# dmgbuild into dist/.dmgbuild-venv from hash-pinned requirements (pip --require-hashes).
+# Nothing else. Fails closed: any step that does not verify stops it.
 
 set -euo pipefail
 
@@ -49,9 +51,8 @@ KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 OUT=dist
 APP="$OUT/build/Snapline.app"
 DMG="$OUT/Snapline.dmg"
-STAGE="$OUT/dmg-root"
 mkdir -p "$OUT"
-rm -rf "$OUT/build" "$STAGE" "$DMG" "$DMG.sha256" "$OUT/Snapline.zip"
+rm -rf "$OUT/build" "$DMG" "$DMG.sha256" "$OUT/Snapline.zip"
 
 log "build $VERSION: universal, Developer ID, secure timestamp"
 NOKTA_UNIVERSAL=1 NOKTA_SIGN_IDENTITY="$IDENTITY" NOKTA_KEYCHAIN="$KEYCHAIN" NOKTA_KEYCHAIN_PASS="" \
@@ -72,12 +73,8 @@ xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 rm -f "$OUT/Snapline.zip"
 
-log "DMG: Snapline.app + Applications"
-mkdir -p "$STAGE"
-ditto "$APP" "$STAGE/Snapline.app"
-ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "Snapline" -srcfolder "$STAGE" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$DMG" >/dev/null
-rm -rf "$STAGE"
+log "DMG: styled installer window (tools/dmg)"
+bash tools/dmg/make-dmg.sh "$APP" "$DMG"
 codesign --force --sign "$IDENTITY" --keychain "$KEYCHAIN" --timestamp "$DMG"
 codesign --verify --strict --verbose=2 "$DMG"
 

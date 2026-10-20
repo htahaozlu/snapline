@@ -45,7 +45,11 @@ Maximize, Almost Maximize (varsayılan %90, ortalı), Center (boyut korunur), Re
 Classic set: ⌃⌥ + ←→↑↓ (yarılar), U I J K (çeyrekler), D F G (üçte birler), E R T (üçte ikiler),
 ↩ Maximize, ⇧↩ Almost Maximize, C Center, ⌫ Restore, ⌃⌥⌘ ←/→ ekranlar.
 Alternate set (VoiceOver kullanıcıları için; ⌃⌥ VO tuşudur ve VO+⌘ komutları da vardır → ⌃ ile ⌥ hiç
-birlikte kullanılmaz): tiling ⌃⇧⌘ + aynı tuşlar, ekranlar ⌃⇧⌘ [ / ], almost maximize ⌃⇧⌘M. Classic
+birlikte kullanılmaz): tiling ⌃⇧⌘ + aynı tuşlar, ekranlar ⌃⇧⌘ [ / ], almost maximize ⌃⇧⌘M.
+Option-Command set (0.4.0; Spectacle'ın yaygınlaştırdığı, Tiles'ın koruduğu düzen): ⌥⌘ + ←→↑↓ ve
+U I J K, ⌥⌘F Maximize, ⇧⌥⌘↩ Almost Maximize, ⌥⌘C Center, ⌥⌘Y Restore, ⇧⌥⌘ D F G üçte birler (⌥⌘D
+Dock'undur), ⌃⌘ ←/↑/→ üçte ikiler, ekranlar ⌃⌥⌘ ←/→. Tiles ya da Spectacle kuruluysa ve kısayollara
+dokunulmamışsa onboarding bu setle başlar (VoiceOver'ın Alternate'i önceliklidir). Classic
 aktifken VoiceOver açılırsa ⌃⌥ kayıtları askıya alınır (VO kapanınca geri gelir; "Keep ⌃⌥ with
 VoiceOver" ile kapatılabilir). Kayıt Carbon `RegisterEventHotKey` (izin gerektirmez, virtual key
 code = fiziksel konum). Yalnız-⌥ / ⌥⇧ kombinasyonlarında recorder uyarır (macOS 15.0–15.1 bunları

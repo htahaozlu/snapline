@@ -29,6 +29,22 @@ v0.1 → v2: bundle 1.27 MB → 926 kB (Doto font removed), after-use memory 13.
 (vector overlay, glyph-path label), idle 11.7–12.0 MB → 11.4–11.7 MB (vmmap), binary 667 kB → 822 kB
 (onboarding scenes, motion engine, new Settings views).
 
+## 2026-10-20 — 0.4.0 size check (practice screen, Option-Command set)
+
+Only size was re-measured; the runtime numbers below are from the 0.3.0 candidate, and the change
+adds no timer, observer or work outside onboarding's screen 3 (a local key monitor lives only while
+that screen is up; one workspace observer re-binds a shortcut another app held when an app quits).
+
+| Item | 0.3.0 | 0.4.0 |
+|---|---|---|
+| Binary, arm64, `-Osize -wmo`, strip -x | 842,112 B | 875,520 B with the new screen → **842,096 B** with `-Xfrontend -disable-reflection-metadata` (≤ 850 kB PASS) |
+| `__TEXT` | 39 × 16 KB pages | 41 → **39** pages (`__swift5_reflstr`/`fieldmd`/`assocty`/`builtin` gone, `typeref` 6.4 → 3.2 kB) |
+| Bundle (du) | 946 kB | **936 kB** (≤ 950 kB PASS) |
+
+Nothing in `app/Sources` prints a value through reflection (every interpolation is a String, a
+number or a rawValue/title/id; no Mirror, no dump), so dropping the tables changes no output. The
+snapshot tool keeps them (its file names print enum cases).
+
 ## 2026-10-19 — keyboard / recovery candidate (uncommitted on b93cdd2)
 
 Apple M3, 8 cores, 16 GB, macOS 26.5 (25F71), lid closed + BenQ EW3270U 3840 × 2160 (main). Release

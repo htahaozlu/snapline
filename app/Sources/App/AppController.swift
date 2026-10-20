@@ -182,9 +182,10 @@ final class AppController: NSObject, NSApplicationDelegate {
     /// Onboarding opens by itself on a first launch, and whenever Accessibility is missing (Nokta
     /// cannot work then; a returning user lands on the permission screen, not on Welcome). A user
     /// who closed it once while access was there is not shown it again at every launch: the menu
-    /// keeps "Finish Setup…" for them.
+    /// keeps "Finish Setup…" for them. Once more, on its practice screen, for people who set up
+    /// before that screen existed (or closed setup before reaching it).
     static func showsOnboardingAtLaunch(trusted: Bool, prefs: Preferences) -> Bool {
-        !trusted || (!prefs.onboardingDone && !prefs.onboardingSeen)
+        !trusted || (!prefs.onboardingDone && !prefs.onboardingSeen) || !prefs.practiceSeen
     }
 
     private func reportReadyAndQuit() {
@@ -430,6 +431,13 @@ final class AppController: NSObject, NSApplicationDelegate {
         if !shortcutsSuspended { hotkeyResults = results }
     }
 
+    /// Another app held one of the shortcuts and an app just quit: bind again (only the failed
+    /// ones are registered anew; live bindings are left alone).
+    func rebindIfAnyTaken() {
+        guard isRunning, hotkeyResults.values.contains(.hotkey) else { return }
+        applyPreferences()
+    }
+
     private func applyPreferences() {
         guard !applyingPreferences else { return }
         applyingPreferences = true
@@ -456,11 +464,13 @@ final class AppController: NSObject, NSApplicationDelegate {
         case .failed:
             feedback?.failed(event)
             hud?.show(event)
+            statusMenu?.noteSnap(event) // onboarding's practice: the shortcut arrived, nothing moved
             // The permission vanished under a running core: heal outside its callback.
             if event.result == .notTrusted { scheduleHealthCheck(after: .milliseconds(0)) }
         case .hotkeyState:
             if let action = event.action { hotkeyResults[action] = event.result }
             settings?.refresh()
+            onboarding?.practiceStateChanged()
         }
     }
 
@@ -472,6 +482,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         observers.append(ws.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
             guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             self?.engine.appActivated(pid: app.processIdentifier, bundleID: app.bundleIdentifier)
+        })
+        // A shortcut another app held (Tiles, Spectacle…) frees up when that app quits: bind again.
+        observers.append(ws.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.rebindIfAnyTaken()
         })
         // Sleep/wake and fast user switching are where competitors silently lose hotkeys
         // and taps: re-check and re-arm.
@@ -580,6 +594,14 @@ final class AppController: NSObject, NSApplicationDelegate {
         let controller = settings ?? SettingsWindowController(app: self)
         settings = controller
         controller.select(tab: tab)
+        return controller
+    }
+
+    /// Tests: onboarding built as `showOnboarding` would, without showing a window.
+    func testAttachOnboarding() -> OnboardingWindowController {
+        let controller = onboarding ?? OnboardingWindowController(app: self)
+        onboarding = controller
+        controller.prepareWindow()
         return controller
     }
     #endif

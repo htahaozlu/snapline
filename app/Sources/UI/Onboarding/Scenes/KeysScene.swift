@@ -1,15 +1,17 @@
 import AppKit
 import QuartzCore
 
-/// Scene C — the keycap demo (docs/DESIGN.md §11; design-v2-opus.md §3.6 Storyboard C). The keys
-/// of the user's own shortcuts (⌃ ⌥ + arrow for the Classic set) press, and the mini window
+/// Scene C — the practice keyboard (docs/DESIGN.md §11; design-v2-opus.md §3.6 Storyboard C). The
+/// keys of the user's own shortcuts (⌃ ⌥ + arrow for the Classic set) press, and the mini window
 /// settles in one step with the O5 flash at scene scale: ← left half, → right half, ↩ maximize,
 /// ⌫ back where it was.
 ///
-/// Demo: a 4000 ms loop of four 1000 ms segments, at most 3 times; restT 400 (← done, keys up),
-/// explainT 150 (⌃⌥← held, the window in the left half). Mirror mode: once the user snaps for real
-/// the demo stops for good, and each of the four actions plays its own segment once (400 ms) — the
-/// scene shows what the user actually did, including the size a repeated half cycles to.
+/// Guide: the next step to practise, a 2400 ms loop at most 3 times — keys down at 600, the window
+/// lands at 700 and holds, the seam puts it back; restT 0 (keys up, the window where it is),
+/// explainT 750 (keys held, the window on its target). Mirror: each real snap of the four actions
+/// plays its own segment once (400 ms) from where the window is, so the scene shows what the user
+/// actually did, including the size a repeated half cycles to. Held: while the user holds
+/// modifiers, their keycaps sit pressed (a static pose, no motion).
 final class KeysScene: StageScene {
     enum ID {
         static let flash = "c.fl."
@@ -23,7 +25,7 @@ final class KeysScene: StageScene {
     static let inner = CGRect(x: 26, y: 29, width: 228, height: 142)
     static let restRect = CGRect(x: 80, y: 62, width: 120, height: 76)
     static let actions: [NoktaAction] = [.leftHalf, .rightHalf, .maximize, .restore]
-    static let loop = 4000.0, segment = 1000.0, restT = 400.0, explainT = 150.0, mirror = 400.0
+    static let guide = 2400.0, guideLead = 600.0, mirror = 400.0
     /// The keys' centre (storyboard: three 48 pt keys at x 296 / 352 / 408, y 76).
     static let keysCenter = CGPoint(x: 376, y: 100)
 
@@ -36,8 +38,8 @@ final class KeysScene: StageScene {
     private var keys: [Keycap] = []
     private(set) var modifiers: NoktaMods = [.control, .option]
     private(set) var actionKeys = ["←", "→", "↩", "⌫"]
-    /// Where the demo window is in the model pose (mirror segments start from it).
-    private(set) var windowRect = KeysScene.target(.leftHalf)
+    /// Where the demo window is in the model pose (guide loops and mirror segments start from it).
+    private(set) var windowRect = KeysScene.restRect
 
     /// Mirror mode (set by the owner): VoiceOver hears that the scene shows the user's own snap.
     var mirroring = false
@@ -51,6 +53,9 @@ final class KeysScene: StageScene {
         if modifiers.contains(.command) { names.append("Command") }
         return "Animation: \((names + ["arrow keys"]).joined(separator: " ")) move a window."
     }
+
+    /// The modifier of each modifier keycap, left to right (the action key comes after them).
+    private var capModifiers: [NoktaMods] { [NoktaMods.control, .option, .shift, .command].filter { modifiers.contains($0) } }
 
     override init() {
         super.init()
@@ -170,22 +175,41 @@ final class KeysScene: StageScene {
         ]
     }
 
-    /// The demo loop. pose(0) == pose(4000): the window is back at rest after ⌫, and on the seam
-    /// the ← glyph and the (hidden) flash geometry return to their first values.
-    var loopTimeline: Timeline {
-        var parts: [(at: Double, timeline: Timeline)] = []
-        var from = Self.restRect
-        for (k, action) in Self.actions.enumerated() {
-            let to = Self.target(action)
-            parts += segment(k, from: from, to: to, press: true, at: Double(k) * Self.segment)
-            from = to
-        }
-        let start = hidden.merging(window.pose(Self.restRect))
+    /// Practice: `action`'s segment from where the window is now, on a loop — the step to try
+    /// next. pose(0) == pose(2400): the seam puts the window back. nil for actions the scene has
+    /// no segment for.
+    func guideTimeline(_ action: NoktaAction) -> Timeline? {
+        guard let k = Self.actions.firstIndex(of: action) else { return nil }
+        let start = hidden.merging(window.pose(windowRect)).merging(glyphs(k))
+        let parts = segment(k, from: windowRect, to: Self.target(action), press: true, at: Self.guideLead)
         func loop(_ parts: [(at: Double, timeline: Timeline)]) -> Timeline {
-            Timeline.sequence(name: "onb.keys", duration: Self.loop, restT: Self.restT, explainT: Self.explainT, start: start, parts: parts)
+            Timeline.sequence(name: "onb.keys.guide", duration: Self.guide, restT: 0, explainT: Self.guideLead + 150,
+                              start: start, parts: parts)
         }
         let first = loop(parts).pose(at: 0)
-        return loop(parts + [(Self.loop, Timeline(name: "c.seam", duration: 0, base: first))])
+        return loop(parts + [(Self.guide, Timeline(name: "c.seam", duration: 0, base: first))])
+    }
+
+    /// Keys up and the window where it is: the scene between steps.
+    func restingPose(_ action: NoktaAction?) -> Pose {
+        let k = action.flatMap { Self.actions.firstIndex(of: $0) } ?? 0
+        return hidden.merging(window.pose(windowRect)).merging(glyphs(k)).merging(heldPose([]))
+    }
+
+    /// The user's held modifiers on the keycaps: a cap whose modifier is down sits pressed.
+    func heldPose(_ held: NoktaMods) -> Pose {
+        var p = Pose()
+        for (i, m) in capModifiers.enumerated() {
+            let down = held.contains(m)
+            p[ID.cap(i), "transform.translation.y"] = Self.s(down ? 2 : 0)
+            p[ID.wash(i), "opacity"] = Self.s(down ? 1 : 0)
+        }
+        let action = keys.count - 1
+        if action >= 0 {
+            p[ID.cap(action), "transform.translation.y"] = Self.s(0)
+            p[ID.wash(action), "opacity"] = Self.s(0)
+        }
+        return p
     }
 
     /// Mirror mode: `action`'s segment once, from where the window is now; nil for actions the
@@ -197,7 +221,7 @@ final class KeysScene: StageScene {
                                  start: hidden.merging(window.pose(windowRect)), parts: segment(k, from: windowRect, to: to, press: press, at: 0))
     }
 
-    /// Records where the window rests after `timeline` (the loop's rest is the left half).
+    /// Records where the window rests after a mirror `timeline`.
     func settled(after timeline: Timeline) {
         if case .point(let o)? = timeline.restPose[window.windowID, "position"],
            case .rect(let b)? = timeline.restPose[window.windowID, "bounds"] {

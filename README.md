@@ -69,7 +69,8 @@
 |---|---|
 | **Drag to snap** | Edges for halves, corners for quarters, the top edge to maximize, the bottom edge in three segments for thirds. Hold <kbd>⇧</kbd> for an alternate map. Every zone is re-assignable. Dragging a snapped window gives it back its size. |
 | **20 keyboard actions** | Halves, quarters, thirds, two-thirds, maximize, almost maximize, center, restore, next / previous display. Repeating a half cycles ½ → ⅔ → ⅓. |
-| **Two shortcut sets** | *Classic* (<kbd>⌃⌥</kbd>, the community standard) and *Alternate* (<kbd>⌃⇧⌘</kbd>, never VoiceOver's <kbd>⌃⌥</kbd>). Or record your own. |
+| **Three shortcut sets** | *Classic* (<kbd>⌃⌥</kbd>, the community standard), *Option-Command* (<kbd>⌥⌘</kbd>, the Spectacle and Tiles layout — chosen for you when one of them is installed) and *Alternate* (<kbd>⌃⇧⌘</kbd>, never VoiceOver's <kbd>⌃⌥</kbd>). Or record your own. |
+| **Practice built in** | The last setup screen is a short practice: it shows the keys you hold, ticks each shortcut that reaches Snapline, and says why when one does not. Reopen it any time from Settings › Shortcuts › **Practice…**. |
 | **Your keyboard layout** | A shortcut is a key position, so it keeps working when you switch layouts; its label follows the layout you type with (Turkish Q shows `⌃⇧⌘Ü` where US shows `⌃⇧⌘]`). |
 | **Calm feedback** | A short flash and an optional label on keyboard snaps; sound off by default; haptics on trackpads. |
 | **Stays out of the way** | Gaps, app exclusions, launch at login, pause from the menu bar. Re-arms itself after sleep, user switching and Accessibility changes. |
@@ -121,9 +122,15 @@ move other apps' windows. No Input Monitoring, no Screen Recording, nothing leav
   <tr>
     <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/app/onboarding-1-dark.png"><img src="docs/images/app/onboarding-1-light.png" alt="Welcome"></picture></td>
     <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/app/onboarding-2-dark.png"><img src="docs/images/app/onboarding-2-light.png" alt="Allow Accessibility"></picture></td>
-    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/app/onboarding-3-granted-dark.png"><img src="docs/images/app/onboarding-3-granted-light.png" alt="Try a shortcut"></picture></td>
+    <td width="33%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/app/onboarding-3-practice-dark.png"><img src="docs/images/app/onboarding-3-practice-light.png" alt="The practice: two shortcuts ticked, the next one outlined"></picture></td>
   </tr>
 </table>
+
+The last screen is a practice. Snapline outlines the next shortcut, shows the modifiers you hold on
+the keycaps, ticks each shortcut that arrives and moves the window, and when a press goes elsewhere it
+says where: <kbd>⌥⌘←</kbd> belongs to the *Option-Command* set (one click switches), Tiles is running
+and holds the key, or the key reached the window instead of Snapline. The demo waits while you press
+and carries on after a few quiet seconds.
 
 If you say *Later*, Snapline stays usable: the menu bar icon shows the missing permission and the menu
 leads with **Allow Accessibility…**. Turn the permission off later and Snapline notices within a
@@ -131,15 +138,19 @@ second; turn it back on and every shortcut comes back — no restart.
 
 ## Shortcuts
 
-| Action | Classic | Alternate |
-|---|---|---|
-| Left / Right / Top / Bottom half | <kbd>⌃⌥</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> |
-| Quarters | <kbd>⌃⌥</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> |
-| First / Middle / Last third | <kbd>⌃⌥</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> |
-| First / Middle / Last two thirds | <kbd>⌃⌥</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> |
-| Maximize / Almost maximize | <kbd>⌃⌥↩</kbd> / <kbd>⌃⌥⇧↩</kbd> | <kbd>⌃⇧⌘↩</kbd> / <kbd>⌃⇧⌘M</kbd> |
-| Center / Restore | <kbd>⌃⌥C</kbd> / <kbd>⌃⌥⌫</kbd> | <kbd>⌃⇧⌘C</kbd> / <kbd>⌃⇧⌘⌫</kbd> |
-| Next / Previous display | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⇧⌘]</kbd> / <kbd>⌃⇧⌘[</kbd> |
+| Action | Classic | Option-Command | Alternate |
+|---|---|---|---|
+| Left / Right / Top / Bottom half | <kbd>⌃⌥</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌥⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> |
+| Quarters | <kbd>⌃⌥</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌥⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>J</kbd> <kbd>K</kbd> |
+| First / Middle / Last third | <kbd>⌃⌥</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⇧⌥⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> |
+| First / Middle / Last two thirds | <kbd>⌃⌥</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> | <kbd>⌃⌘</kbd> <kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> | <kbd>⌃⇧⌘</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>T</kbd> |
+| Maximize / Almost maximize | <kbd>⌃⌥↩</kbd> / <kbd>⌃⌥⇧↩</kbd> | <kbd>⌥⌘F</kbd> / <kbd>⇧⌥⌘↩</kbd> | <kbd>⌃⇧⌘↩</kbd> / <kbd>⌃⇧⌘M</kbd> |
+| Center / Restore | <kbd>⌃⌥C</kbd> / <kbd>⌃⌥⌫</kbd> | <kbd>⌥⌘C</kbd> / <kbd>⌥⌘Y</kbd> | <kbd>⌃⇧⌘C</kbd> / <kbd>⌃⇧⌘⌫</kbd> |
+| Next / Previous display | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⌥⌘→</kbd> / <kbd>⌃⌥⌘←</kbd> | <kbd>⌃⇧⌘]</kbd> / <kbd>⌃⇧⌘[</kbd> |
+
+**Coming from Spectacle or Tiles?** *Option-Command* is their layout (<kbd>⌥⌘D</kbd> stays the Dock's,
+so thirds add <kbd>⇧</kbd>), and Snapline starts on it when it finds one of them installed. Quit the
+other app: two window managers on the same keys means one of them never gets the press.
 
 While VoiceOver runs, <kbd>⌃⌥</kbd> shortcuts step aside so VoiceOver keeps its keys (unless you use
 Caps Lock as the VoiceOver key and say so in Settings).
@@ -244,8 +255,14 @@ Developer ID, so this should be rare.)
 **A shortcut says "in use by another app".** Another window manager or utility registered it first.
 Quit it or pick another combination — Snapline kept your previous one.
 
+**I press a shortcut and nothing happens.** Open Settings › Shortcuts › **Practice…** and press it
+there. The practice says what became of the press: a shortcut of another set (switch the set right
+there), a key another app holds (it names Tiles, Spectacle, Rectangle, Magnet or Moom when they run),
+or a key that reached the window instead of Snapline.
+
 **Does it work with Rectangle / Magnet / Tiles running?** Yes, but whichever app registers a combination
-first gets it. Snapline shows which of its shortcuts could not be registered.
+first gets it. Snapline shows which of its shortcuts could not be registered, and registers them as
+soon as an app quits and frees them.
 
 **Does it send anything anywhere?** No. There is no network code in the app at all.
 

@@ -62,6 +62,8 @@ printf '\033[1m==>\033[0m keyboard-test (recorder, shortcuts, layouts)\n'
 "$WORK/nokta-snapshot" --keyboard-test
 printf '\033[1m==>\033[0m recovery-test (first use, permission, re-binding)\n'
 "$WORK/nokta-snapshot" --recovery-test
+printf '\033[1m==>\033[0m practice-test (shortcut sets, onboarding practice)\n'
+"$WORK/nokta-snapshot" --practice-test
 
 printf '\033[1m==>\033[0m render → %s\n' "$OUT"
 "$WORK/nokta-snapshot" "$OUT" "$ROOT"

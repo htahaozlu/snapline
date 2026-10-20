@@ -25,7 +25,7 @@ final class Preferences {
         static let shortcuts = "shortcuts.v1", zoneActions = "zoneActions.v1", zoneActionsAlt = "zoneActionsAlt.v1"
         static let excluded = "excludedBundleIDs"
         static let sound = "soundEnabled", haptics = "hapticsEnabled", hud = "hudMode"
-        static let onboardingDone = "onboardingDone.v1", onboardingSeen = "onboardingSeen.v1"
+        static let onboardingDone = "onboardingDone.v1", onboardingSeen = "onboardingSeen.v1", practiceSeen = "practiceSeen.v1"
         static let keepClassicWithVoiceOver = "keepClassicWithVoiceOver"
     }
 
@@ -140,23 +140,96 @@ final class Preferences {
     enum ShortcutSet: String, CaseIterable {
         /// ⌃⌥ + key (community-standard layout).
         case classic
+        /// ⌥⌘ + key: the layout Spectacle made common and Tiles keeps (halves on the arrows,
+        /// quarters on U I J K, ⌥⌘F maximize, ⌥⌘C center), for people who already type it.
+        case optionCommand
         /// ⌃⇧⌘ + key: never uses ⌃⌥ together (VoiceOver's VO keys).
         case alternate
+
+        var title: String {
+            switch self {
+            case .classic: return "Classic"
+            case .optionCommand: return "Option-Command"
+            case .alternate: return "Alternate"
+            }
+        }
+        /// The set's main modifiers, as its picker shows them.
+        var symbols: String {
+            switch self {
+            case .classic: return "⌃⌥"
+            case .optionCommand: return "⌥⌘"
+            case .alternate: return "⌃⇧⌘"
+            }
+        }
+        var label: String { "\(title) \(symbols)" }
+        /// The set in words (the pickers' tooltips).
+        var help: String {
+            switch self {
+            case .classic: return "Classic: Control-Option + key"
+            case .optionCommand: return "Option-Command + key, as in Spectacle and Tiles"
+            case .alternate: return "Alternate: Control-Shift-Command + key, clear of VoiceOver"
+            }
+        }
     }
 
     /// Default shortcut of `action` within a set. Alternate never combines ⌃ and ⌥ (VoiceOver's
     /// VO keys, including VO+⌘ commands): tiling uses ⌃⇧⌘ + the Classic key, displays ⌃⇧⌘ [ / ],
-    /// almost maximize ⌃⇧⌘M.
+    /// almost maximize ⌃⇧⌘M. Option-Command: ⌥⌘ + the Classic key for halves and quarters,
+    /// ⌥⌘F maximize, ⌥⌘C center, ⌥⌘Y restore, ⇧⌥⌘↩ almost maximize, ⇧⌥⌘ D/F/G thirds (⌥⌘D is
+    /// the Dock's), ⌃⌘ ←/↑/→ two thirds; displays stay ⌃⌥⌘ ←/→.
     static func preset(_ set: ShortcutSet, for action: NoktaAction) -> Shortcut? {
         guard let s = action.defaultShortcut else { return nil }
-        guard set == .alternate else { return s }
-        let hyper = NoktaMods([.control, .shift, .command]).rawValue
-        switch action {
-        case .nextDisplay: return Shortcut(keyCode: 0x1E, mods: hyper)   // ]
-        case .prevDisplay: return Shortcut(keyCode: 0x21, mods: hyper)   // [
-        case .almostMaximize: return Shortcut(keyCode: 0x2E, mods: hyper) // M
-        default: return Shortcut(keyCode: s.keyCode, mods: hyper)
+        switch set {
+        case .classic:
+            return s
+        case .alternate:
+            let hyper = NoktaMods([.control, .shift, .command]).rawValue
+            switch action {
+            case .nextDisplay: return Shortcut(keyCode: 0x1E, mods: hyper)   // ]
+            case .prevDisplay: return Shortcut(keyCode: 0x21, mods: hyper)   // [
+            case .almostMaximize: return Shortcut(keyCode: 0x2E, mods: hyper) // M
+            default: return Shortcut(keyCode: s.keyCode, mods: hyper)
+            }
+        case .optionCommand:
+            let oc = NoktaMods([.option, .command]).rawValue
+            let soc = NoktaMods([.shift, .option, .command]).rawValue
+            let cc = NoktaMods([.control, .command]).rawValue
+            switch action {
+            case .firstThird, .centerThird, .lastThird: return Shortcut(keyCode: s.keyCode, mods: soc) // D F G
+            case .firstTwoThirds: return Shortcut(keyCode: 0x7B, mods: cc)  // ←
+            case .centerTwoThirds: return Shortcut(keyCode: 0x7E, mods: cc) // ↑
+            case .lastTwoThirds: return Shortcut(keyCode: 0x7C, mods: cc)   // →
+            case .maximize: return Shortcut(keyCode: 0x03, mods: oc)        // F
+            case .almostMaximize: return Shortcut(keyCode: 0x24, mods: soc) // ↩
+            case .restore: return Shortcut(keyCode: 0x10, mods: oc)         // Y
+            case .nextDisplay, .prevDisplay: return s
+            default: return Shortcut(keyCode: s.keyCode, mods: oc)          // arrows, U I J K, C
+            }
         }
+    }
+
+    /// Window managers whose default keys match a set: if one is installed and the user never
+    /// touched the shortcuts, onboarding starts on that set (bundle id → name and set).
+    static let familiarApps: [(bundleID: String, name: String, set: ShortcutSet)] = [
+        ("com.sempliva.Tiles", "Tiles", .optionCommand),
+        ("com.divisiblebyzero.Spectacle", "Spectacle", .optionCommand),
+    ]
+
+    /// Window managers that hold global shortcuts of their own while they run (bundle id → name).
+    static let otherWindowManagers: [(bundleID: String, name: String)] = familiarApps.map { ($0.bundleID, $0.name) } + [
+        ("com.knollsoft.Rectangle", "Rectangle"),
+        ("com.crowdcafe.windowmagnet", "Magnet"),
+        ("com.manytricks.Moom", "Moom"),
+    ]
+
+    /// The first installed app of `familiarApps` (nil: none).
+    static func familiarApp(installed: (String) -> Bool) -> (name: String, set: ShortcutSet)? {
+        familiarApps.first { installed($0.bundleID) }.map { ($0.name, $0.set) }
+    }
+
+    /// Names of the apps of `otherWindowManagers` among `running` (bundle ids).
+    static func runningWindowManagers(among running: [String?]) -> [String] {
+        otherWindowManagers.filter { m in running.contains(m.bundleID) }.map(\.name)
     }
 
     /// Replaces every shortcut with the given set.
@@ -240,6 +313,12 @@ final class Preferences {
     var onboardingSeen: Bool {
         get { defaults.bool(forKey: Key.onboardingSeen) }
         set { if newValue != onboardingSeen { defaults.set(newValue, forKey: Key.onboardingSeen) } }
+    }
+    /// The practice screen (onboarding's Try page) was closed at least once. People who finished
+    /// setup before it existed see it once more, on its own. Written once, no notification.
+    var practiceSeen: Bool {
+        get { defaults.bool(forKey: Key.practiceSeen) }
+        set { if newValue != practiceSeen { defaults.set(newValue, forKey: Key.practiceSeen) } }
     }
 
     /// Login item state lives in ServiceManagement, not UserDefaults. Only toggled by the

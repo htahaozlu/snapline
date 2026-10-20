@@ -40,12 +40,15 @@ KeyNames.layoutOverride = KeyboardLayout.installed(id: "com.apple.keylayout.US")
 if arguments.contains("--self-test") {
     exit(SelfTest.run() ? 0 : 1)
 }
-// Behaviour suites (KeyboardTests.swift, RecoveryTests.swift): inert core, nothing shown or written.
+// Behaviour suites (KeyboardTests.swift, RecoveryTests.swift, PracticeTests.swift): inert core, nothing shown or written.
 if arguments.contains("--keyboard-test") {
     exit(KeyboardTests.run() ? 0 : 1)
 }
 if arguments.contains("--recovery-test") {
     exit(RecoveryTests.run() ? 0 : 1)
+}
+if arguments.contains("--practice-test") {
+    exit(PracticeTests.run() ? 0 : 1)
 }
 
 let outDir = URL(fileURLWithPath: arguments.count > 1 ? arguments[1] : "tools/snapshot/out", isDirectory: true)

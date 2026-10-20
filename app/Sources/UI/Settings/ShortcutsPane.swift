@@ -1,7 +1,7 @@
 import AppKit
 
 /// Settings › Shortcuts (DESIGN §8): grouped table of recorders, shortcut set, cycle, flash and
-/// Almost Maximize, the VoiceOver protection, Restore Defaults. Registration failures come from
+/// Almost Maximize, the VoiceOver protection, Restore Defaults and Practice. Registration failures come from
 /// `app.hotkeyResults`.
 final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTableViewDelegate {
     private enum Row {
@@ -38,7 +38,7 @@ final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTabl
     private var voiceOverRow: NSGridRow!
     private var voiceOverHelpRow: NSGridRow!
     private var voiceOverHelp: NSTextField!
-    private let sets: [Preferences.ShortcutSet] = [.classic, .alternate]
+    private let sets = Preferences.ShortcutSet.allCases
     private static let rowHeight: CGFloat = 28
 
     #if NOKTA_SNAPSHOT
@@ -98,13 +98,13 @@ final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTabl
         ])
         form.wide(box)
 
-        setControl = UIControls.segmented(["Classic ⌃⌥", "Alternate ⌃⇧⌘"], title: "Shortcut set",
+        // The sets by their keys (the names are in the tooltips and the help line).
+        setControl = UIControls.segmented(sets.map(\.symbols), title: "Shortcut set",
                                           target: self, action: #selector(changeSet(_:)))
-        setControl.setToolTip("Control-Option + key", forSegment: 0)
-        setControl.setToolTip("Control-Shift-Command + key", forSegment: 1)
+        for (i, set) in sets.enumerated() { setControl.setToolTip(set.help, forSegment: i) }
         form.group()
         form.row("Shortcut set", control: setControl)
-        form.help("Alternate avoids the VoiceOver keys.")
+        form.help("⌃⌥ Classic. ⌥⌘ as in Spectacle and Tiles. ⌃⇧⌘ avoids the VoiceOver keys.")
 
         cycleSwitch = UIControls.toggle("Repeat to cycle ½ ⅔ ⅓", target: self, action: #selector(toggleCycle(_:)))
         form.row("Repeat to cycle ½ ⅔ ⅓", control: cycleSwitch)
@@ -121,7 +121,11 @@ final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTabl
         (voiceOverHelpRow, voiceOverHelp) = form.help(keepHelp)
 
         form.separator()
-        form.wide(UIControls.button("Restore Defaults", target: self, action: #selector(restoreDefaults(_:))))
+        let buttons = NSStackView(views: [UIControls.button("Restore Defaults", target: self, action: #selector(restoreDefaults(_:))),
+                                          UIControls.button("Practice…", target: self, action: #selector(practice(_:)))])
+        buttons.orientation = .horizontal
+        buttons.spacing = Theme.Space.s3
+        form.wide(buttons)
         return form.finish()
     }
 
@@ -372,7 +376,7 @@ final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTabl
         }
         // Custom shortcuts would be lost: ask first.
         let alert = NSAlert()
-        alert.messageText = "Use the \(set == .classic ? "Classic" : "Alternate") set?"
+        alert.messageText = "Use the \(set.title) set?"
         alert.informativeText = "This replaces your custom shortcuts."
         alert.addButton(withTitle: "Replace")
         alert.addButton(withTitle: "Cancel")
@@ -381,6 +385,12 @@ final class ShortcutsPane: SettingsPaneController, NSTableViewDataSource, NSTabl
             if response == .alertFirstButtonReturn { self.prefs.applyShortcutSet(set) }
             self.refresh()
         }
+    }
+
+    /// Onboarding's practice screen: try the shortcuts and see whether they arrive.
+    @objc private func practice(_ sender: Any?) {
+        OnboardingWindowController.opensAtPractice = true
+        app.showOnboarding()
     }
 
     /// Custom shortcuts are replaced only after the user says so (a set's own shortcuts are not
